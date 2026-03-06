@@ -1,0 +1,38 @@
+.app-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.documents-panel {
+  border-right: 1px solid #e0e0e0;
+  background-color: #fafafa;
+}
+
+.chat-panel {
+  background-color: #ffffff;
+}
+
+.placeholder-text {
+  color: #888;
+  font-size: 0.95rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .documents-panel {
+    border-right-color: #333;
+    background-color: #1a1a1a;
+  }
+
+  .chat-panel {
+    background-color: #242424;
+  }
+}
