@@ -9,6 +9,7 @@ This is a **take-home technical assessment** for a senior software engineer posi
 - **PROMPT.md** -- The assessment requirements. Read this first and refer back to it throughout.
 - **.docs/adr/** -- Write one Architecture Decision Record (ADR) per significant decision; see the README there for format and numbering.
 - **.cursor/rules/** -- Project rules that guide code quality, testing, planning, and workflow. These are automatically applied.
+- **.cursor/rules/glossary.mdc** -- Definitions for ambiguous terms (e.g. "over-engineer", "unit of work", "system boundaries") used across the rules. Consult this when a term's meaning is unclear.
 
 ## Workflow
 
