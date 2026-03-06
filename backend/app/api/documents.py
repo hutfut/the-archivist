@@ -1,0 +1,76 @@
+from pathlib import PurePosixPath
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import Settings, get_settings
+from app.db.session import get_session
+from app.models.document import DocumentListResponse, DocumentResponse
+from app.services import document_service
+
+router = APIRouter(prefix="/api", tags=["documents"])
+
+
+def _validate_upload(file: UploadFile, settings: Settings) -> None:
+    """Raise HTTPException if the upload is invalid."""
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename is required",
+        )
+
+    extension = PurePosixPath(file.filename).suffix.lower()
+    if extension not in settings.allowed_extensions:
+        allowed = ", ".join(sorted(settings.allowed_extensions))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type: {extension}. Allowed: {allowed}",
+        )
+
+
+@router.post(
+    "/documents",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_document(
+    file: UploadFile,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> DocumentResponse:
+    _validate_upload(file, settings)
+
+    first_chunk = await file.read(1)
+    if not first_chunk:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is empty",
+        )
+    await file.seek(0)
+
+    return await document_service.save_document(file, session, settings)
+
+
+@router.get("/documents", response_model=DocumentListResponse)
+async def list_documents(
+    session: AsyncSession = Depends(get_session),
+) -> DocumentListResponse:
+    docs = await document_service.list_documents(session)
+    return DocumentListResponse(documents=docs)
+
+
+@router.delete(
+    "/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_document(
+    document_id: str,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    deleted = await document_service.delete_document(document_id, session, settings)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
