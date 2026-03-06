@@ -1,19 +1,5 @@
-# Architectural Decision Log
+# Architectural decisions
 
-Record significant technical decisions here so reviewers understand your reasoning.
+Decisions are recorded as **individual Architecture Decision Records (ADR)** in [.docs/adr/](adr/), one file per decision.
 
----
-
-<!-- Copy the template below for each new decision -->
-
-<!--
-## Decision: [Title]
-
-- **Date**: YYYY-MM-DD
-- **Context**: What problem or question prompted this decision?
-- **Options considered**:
-  1. Option A -- [pros / cons]
-  2. Option B -- [pros / cons]
-- **Decision**: Which option was chosen and why.
-- **Consequences**: Trade-offs accepted, follow-on work required, risks.
--->
+See [.docs/adr/README.md](adr/README.md) for the format and how to add a new ADR.

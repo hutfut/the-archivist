@@ -9,7 +9,7 @@ This project is a take-home technical assessment for a senior software engineer 
 
 - Read @PROMPT.md for the full assessment requirements before starting any work
 - Prioritize: **correctness > readability > extensibility > performance**
-- Log every significant architectural decision in @DECISIONS.md with rationale, alternatives considered, and trade-offs accepted
+- Write one Architecture Decision Record (ADR) per significant decision in .docs/adr/ with rationale, alternatives considered, and trade-offs accepted. **Significant** means choices that shape the system or would be non-obvious to a reviewer: e.g. language/runtime, framework, architecture or module boundaries, data model or API design, testing or deployment approach—not routine implementation details (naming, small refactors, style).
 - Include a comprehensive README.md with: setup/run instructions, design overview, key trade-offs, and assumptions
 - If time-constrained, document what you would do differently with more time in the README under a "Future Improvements" section
 - Do not over-engineer; build what is asked for, well. Mention extensions you considered but chose not to implement

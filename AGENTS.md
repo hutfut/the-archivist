@@ -7,7 +7,7 @@ This is a **take-home technical assessment** for a senior software engineer posi
 ## Key Files
 
 - **PROMPT.md** -- The assessment requirements. Read this first and refer back to it throughout.
-- **DECISIONS.md** -- Log every significant architectural decision here using the template provided.
+- **.docs/adr/** -- Write one Architecture Decision Record (ADR) per significant decision; see the README there for format and numbering.
 - **.cursor/rules/** -- Project rules that guide code quality, testing, planning, and workflow. These are automatically applied.
 
 ## Workflow
@@ -24,5 +24,5 @@ Follow this order for every unit of work:
 
 - Do not modify `PROMPT.md` -- it contains the original assessment requirements.
 - Do not over-engineer. Build what is asked for, well.
-- When making a structural or architectural choice, document it in `DECISIONS.md` before proceeding.
+- When making a structural or architectural choice, add a new ADR in `.docs/adr/` (one document per decision) before proceeding.
 - If something is ambiguous in the prompt, state your assumption explicitly and proceed.

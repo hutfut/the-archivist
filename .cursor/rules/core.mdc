@@ -14,4 +14,4 @@ alwaysApply: true
 - Include type annotations / type hints where the language supports them
 - Prefer composition over inheritance
 - Keep dependencies minimal; justify each one
-- Reference @DECISIONS.md for architectural context before making structural changes
+- Reference the ADRs in .docs/adr/ for architectural context before making structural changes
