@@ -38,6 +38,9 @@ htmlcov/
 *.log
 logs/
 
+# Runtime data
+data/
+
 # Misc
 .cache/
 tmp/
