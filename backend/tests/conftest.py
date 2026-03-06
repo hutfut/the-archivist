@@ -5,7 +5,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings, get_settings
-from app.db.session import close_db, get_session, init_db
+from app.db.session import close_db, init_db
 from app.main import create_app
 
 

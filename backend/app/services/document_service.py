@@ -2,7 +2,6 @@ import logging
 import shutil
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import UploadFile
 from sqlalchemy import select
@@ -77,12 +76,12 @@ async def delete_document(
     if doc is None:
         return False
 
+    await session.delete(doc)
+    await session.commit()
+
     doc_dir = settings.upload_dir / document_id
     if doc_dir.exists():
         shutil.rmtree(doc_dir)
-
-    await session.delete(doc)
-    await session.commit()
 
     logger.info("Deleted document %s (%s)", document_id, doc.filename)
     return True
