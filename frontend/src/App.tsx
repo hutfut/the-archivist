@@ -1,10 +1,13 @@
+import { ChatInterface } from "./components/ChatInterface.tsx";
 import { DocumentList } from "./components/DocumentList.tsx";
 import { DocumentUpload } from "./components/DocumentUpload.tsx";
+import { useChat } from "./hooks/useChat.ts";
 import { useDocuments } from "./hooks/useDocuments.ts";
 
 function App() {
   const { documents, loading, error, uploading, upload, remove, clearError } =
     useDocuments();
+  const chat = useChat();
 
   return (
     <div className="grid grid-cols-[320px_1fr] h-screen overflow-hidden">
@@ -36,11 +39,8 @@ function App() {
         )}
       </aside>
 
-      <main className="flex flex-col overflow-y-auto bg-white dark:bg-gray-800">
-        <h2 className="text-lg font-semibold p-6 pb-3">Chat</h2>
-        <p className="text-gray-500 text-sm px-6">
-          Ask questions about your documents.
-        </p>
+      <main className="flex flex-col overflow-hidden bg-white dark:bg-gray-800">
+        <ChatInterface {...chat} />
       </main>
     </div>
   );
