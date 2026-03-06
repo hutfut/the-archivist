@@ -25,6 +25,25 @@ class Settings:
             "EMBEDDING_MODEL", "all-MiniLM-L6-v2"
         )
     )
+    llm_provider: str = field(
+        default_factory=lambda: os.environ.get("LLM_PROVIDER", "mock")
+    )
+    ollama_model: str = field(
+        default_factory=lambda: os.environ.get("OLLAMA_MODEL", "llama3")
+    )
+    ollama_base_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "OLLAMA_BASE_URL", "http://localhost:11434"
+        )
+    )
+    similarity_threshold: float = field(
+        default_factory=lambda: float(
+            os.environ.get("SIMILARITY_THRESHOLD", "0.3")
+        )
+    )
+    retrieval_top_k: int = field(
+        default_factory=lambda: int(os.environ.get("RETRIEVAL_TOP_K", "5"))
+    )
 
 
 @lru_cache(maxsize=1)
