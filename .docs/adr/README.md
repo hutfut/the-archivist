@@ -38,6 +38,6 @@ Trade-offs accepted, follow-on work, risks.
 
 | #   | Title | Date |
 |-----|-------|------|
-| *(none yet)* | | |
+| 0001 | [Use Python with FastAPI, React, and LangChain/LangGraph](0001-use-python-fastapi-react.md) | 2026-03-06 |
 
 When you add an ADR, append a row to this table.
