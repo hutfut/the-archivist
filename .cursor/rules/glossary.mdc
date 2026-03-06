@@ -1,0 +1,31 @@
+---
+description: Definitions for ambiguous terms used across project rules
+alwaysApply: true
+---
+
+# Glossary
+
+Concrete definitions for terms used in the other rule files. When a term below appears in any rule, this is what it means.
+
+## High-impact definitions
+
+- **Over-engineer** -- Adding abstractions, indirection, or features beyond what PROMPT.md explicitly requires. If you wouldn't defend it in code review as solving a stated requirement, it's over-engineering.
+- **Unit of work** -- One PROMPT.md requirement, or one self-contained subtask within one. Each gets its own plan-implement-test-review-commit cycle.
+- **Production-quality** -- Errors handled and surfaced; inputs validated at entry points; structured logging for key operations/failures; no hardcoded secrets; clear documented contracts.
+- **Relevant test suite** -- All tests in modules that were modified or depend on modified code. When in doubt, run everything. Never commit with any test failing.
+- **System boundaries** -- Points where data enters or leaves your code's control: HTTP handlers, CLI args, file I/O, DB queries, third-party APIs. Internal module calls are not system boundaries.
+- **Boundaries (mocking)** -- Same as system boundaries. Mock the adapter/client that talks to the external system, not internal callers.
+- **Structural changes** -- Adding, removing, or reorganizing modules, packages, layers, or top-level directories. Moving code within a module is not structural.
+- **Comprehensive README** -- Must include: one-command setup, design overview, key trade-offs/assumptions, how to run tests, and a "Future Improvements" section if time-constrained.
+
+## Medium-impact definitions
+
+- **Significant (for ADRs)** -- A decision where reversal would require changes across multiple files/modules. Language, framework, data model, API design, test strategy, deployment.
+- **Small / atomic commits** -- One logical change describable in a single imperative sentence. If you need "and," consider splitting. Related tests belong in the same commit.
+- **Buildable, runnable state** -- App compiles/imports without errors, starts without crashing, all tests pass.
+- **Large (files for git)** -- Over 500 KB, or any binary/generated file that changes frequently.
+- **Implementation details (testing)** -- Internal state, private method call order, exact log messages, internal data structures. Test observable behavior instead.
+- **Magic** -- Behavior that cannot be understood by reading the immediate code: implicit coercion, monkey-patching, decorators that silently alter signatures, conventions requiring external knowledge.
+- **Small (functions)** -- Fits one screen (~40 lines), does one thing. If you can extract a meaningful sub-function with a clear name, the original is too big.
+- **Minimal (dependencies)** -- Every dependency must replace non-trivial code you'd otherwise maintain. If the standard library suffices, don't add a package.
+- **Clear module boundaries** -- Explicit public API per module. No circular dependencies. Internals are not imported by other modules.
