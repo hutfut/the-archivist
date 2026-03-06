@@ -7,6 +7,7 @@ from app.config import Settings, get_settings
 from app.db.session import get_session
 from app.models.document import DocumentListResponse, DocumentResponse
 from app.services import document_service
+from app.services.processing import DocumentProcessor, get_processor
 
 router = APIRouter(prefix="/api", tags=["documents"])
 
@@ -37,6 +38,7 @@ async def upload_document(
     file: UploadFile,
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
+    processor: DocumentProcessor = Depends(get_processor),
 ) -> DocumentResponse:
     _validate_upload(file, settings)
 
@@ -48,7 +50,7 @@ async def upload_document(
         )
     await file.seek(0)
 
-    return await document_service.save_document(file, session, settings)
+    return await document_service.save_document(file, session, settings, processor)
 
 
 @router.get("/documents", response_model=DocumentListResponse)

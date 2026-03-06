@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_processor: PipelineProcessor | None = None
+
 DEFAULT_CHUNK_SIZE = 500
 DEFAULT_CHUNK_OVERLAP = 100
 
@@ -79,7 +81,15 @@ class PipelineProcessor:
     ) -> int:
         from app.db.models import Chunk
 
-        text = extract_text(file_path, content_type)
+        try:
+            text = extract_text(file_path, content_type)
+        except (ValueError, OSError) as exc:
+            logger.warning("Failed to extract text from document %s: %s", doc_id, exc)
+            return 0
+        except Exception:
+            logger.exception("Unexpected error extracting text from document %s", doc_id)
+            return 0
+
         if not text:
             logger.info("Document %s produced no text; skipping embedding", doc_id)
             return 0
@@ -105,3 +115,16 @@ class PipelineProcessor:
         await session.flush()
         logger.info("Processed document %s: %d chunks created", doc_id, len(chunks))
         return len(chunks)
+
+
+def init_processor(embedding_service: EmbeddingService) -> None:
+    """Initialize the global document processor with the given embedding service."""
+    global _processor
+    _processor = PipelineProcessor(embedding_service)
+
+
+def get_processor() -> PipelineProcessor:
+    """FastAPI dependency that returns the document processor."""
+    if _processor is None:
+        raise RuntimeError("Processor not initialized — call init_processor() first")
+    return _processor

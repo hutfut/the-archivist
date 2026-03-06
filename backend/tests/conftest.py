@@ -10,6 +10,8 @@ from app.config import Settings, get_settings
 from app.db.models import Base
 from app.db.session import close_db, init_db
 from app.main import create_app
+from app.services.embedding import MockEmbeddingService
+from app.services.processing import get_processor, init_processor
 
 
 @pytest.fixture(scope="session")
@@ -44,8 +46,12 @@ async def test_settings(tmp_path: Path, database_url: str) -> Settings:
 async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
     await init_db(test_settings.database_url)
 
+    mock_embeddings = MockEmbeddingService()
+    init_processor(mock_embeddings)
+
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: test_settings
+    app.dependency_overrides[get_processor] = lambda: get_processor()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

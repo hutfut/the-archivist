@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -14,11 +15,12 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 async def init_db(database_url: str) -> None:
-    """Create the async engine and run schema creation."""
+    """Create the async engine, enable pgvector, and run schema creation."""
     global _engine, _session_factory
     _engine = create_async_engine(database_url)
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
     async with _engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
 

@@ -8,6 +8,8 @@ from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.config import get_settings
 from app.db.session import close_db, init_db
+from app.services.embedding import HuggingFaceEmbeddingService
+from app.services.processing import init_processor
 
 
 @asynccontextmanager
@@ -15,6 +17,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     await init_db(settings.database_url)
+    embedding_service = HuggingFaceEmbeddingService(settings.embedding_model)
+    init_processor(embedding_service)
     yield
     await close_db()
 

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.db.models import Document
 from app.models.document import DocumentResponse
+from app.services.processing import DocumentProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +19,12 @@ async def save_document(
     file: UploadFile,
     session: AsyncSession,
     settings: Settings,
+    processor: DocumentProcessor,
 ) -> DocumentResponse:
-    """Persist an uploaded file to disk and record metadata in the database."""
+    """Persist an uploaded file to disk, process it, and record metadata."""
     doc_id = str(uuid.uuid4())
     filename = file.filename or "unnamed"
+    content_type = file.content_type or "application/octet-stream"
 
     doc_dir = settings.upload_dir / doc_id
     doc_dir.mkdir(parents=True, exist_ok=True)
@@ -34,16 +37,24 @@ async def save_document(
     doc = Document(
         id=doc_id,
         filename=filename,
-        content_type=file.content_type or "application/octet-stream",
+        content_type=content_type,
         file_size=len(content),
         chunk_count=0,
         created_at=now,
     )
     session.add(doc)
+    await session.flush()
+
+    chunk_count = await processor.process(doc_id, file_path, content_type, session)
+    doc.chunk_count = chunk_count
+
     await session.commit()
     await session.refresh(doc)
 
-    logger.info("Saved document %s (%s, %d bytes)", doc_id, filename, len(content))
+    logger.info(
+        "Saved document %s (%s, %d bytes, %d chunks)",
+        doc_id, filename, len(content), chunk_count,
+    )
     return DocumentResponse.model_validate(doc)
 
 
@@ -71,7 +82,7 @@ async def delete_document(
     session: AsyncSession,
     settings: Settings,
 ) -> bool:
-    """Delete a document's file and metadata. Returns True if found and deleted."""
+    """Delete a document's file, chunks (via CASCADE), and metadata."""
     doc = await get_document(document_id, session)
     if doc is None:
         return False

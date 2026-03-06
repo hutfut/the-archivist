@@ -20,6 +20,11 @@ class Settings:
     allowed_extensions: frozenset[str] = field(
         default_factory=lambda: ALLOWED_EXTENSIONS
     )
+    embedding_model: str = field(
+        default_factory=lambda: os.environ.get(
+            "EMBEDDING_MODEL", "all-MiniLM-L6-v2"
+        )
+    )
 
 
 @lru_cache(maxsize=1)
