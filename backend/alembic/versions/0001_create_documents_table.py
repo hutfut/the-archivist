@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.Column("content_type", sa.String(), nullable=False),
         sa.Column("file_size", sa.Integer(), nullable=False),
         sa.Column("chunk_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
 
 

@@ -3,18 +3,39 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine
+from testcontainers.postgres import PostgresContainer
 
 from app.config import Settings, get_settings
+from app.db.models import Base
 from app.db.session import close_db, init_db
 from app.main import create_app
 
 
+@pytest.fixture(scope="session")
+def pg_container():
+    with PostgresContainer(
+        image="pgvector/pgvector:pg17",
+        username="test",
+        password="test",
+        dbname="test",
+    ) as pg:
+        yield pg
+
+
+@pytest.fixture(scope="session")
+def database_url(pg_container: PostgresContainer) -> str:
+    host = pg_container.get_container_host_ip()
+    port = pg_container.get_exposed_port(5432)
+    return f"postgresql+asyncpg://test:test@{host}:{port}/test"
+
+
 @pytest.fixture
-async def test_settings(tmp_path: Path) -> Settings:
+async def test_settings(tmp_path: Path, database_url: str) -> Settings:
     upload_dir = tmp_path / "uploads"
     upload_dir.mkdir()
     return Settings(
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'test.db'}",
+        database_url=database_url,
         upload_dir=upload_dir,
     )
 
@@ -32,3 +53,8 @@ async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides.clear()
     await close_db()
+
+    engine = create_async_engine(test_settings.database_url)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
