@@ -1,0 +1,13 @@
+---
+description: Enforces plan-before-code workflow for all feature work
+alwaysApply: true
+---
+
+# Plan Before Code
+
+- Before writing any feature, outline the approach: which files will be created/modified, what the key design decisions are, and how you will verify correctness
+- If the task is ambiguous, ask clarifying questions before writing code
+- Break work into small, testable increments that can each be committed independently
+- When multiple approaches exist, present trade-offs (complexity, performance, maintainability) and recommend one with rationale
+- Reference @PROMPT.md for the original assessment requirements -- do not drift from them
+- After planning, confirm the approach before proceeding to implementation

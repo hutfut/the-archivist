@@ -1,0 +1,16 @@
+---
+description: Assessment-specific guardrails and priorities
+alwaysApply: true
+---
+
+# Assessment Context
+
+This project is a take-home technical assessment for a senior software engineer position. Every choice will be evaluated.
+
+- Read @PROMPT.md for the full assessment requirements before starting any work
+- Prioritize: **correctness > readability > extensibility > performance**
+- Log every significant architectural decision in @DECISIONS.md with rationale, alternatives considered, and trade-offs accepted
+- Include a comprehensive README.md with: setup/run instructions, design overview, key trade-offs, and assumptions
+- If time-constrained, document what you would do differently with more time in the README under a "Future Improvements" section
+- Do not over-engineer; build what is asked for, well. Mention extensions you considered but chose not to implement
+- Code should be production-quality: proper error handling, logging where appropriate, clear module boundaries

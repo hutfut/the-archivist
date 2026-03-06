@@ -1,0 +1,16 @@
+---
+description: Git commit hygiene and version control conventions
+alwaysApply: true
+---
+
+# Git Discipline
+
+- Make small, atomic commits -- each commit should represent one logical change
+- Use conventional commit format: `type(scope): description`
+  - Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+  - Scope is optional but encouraged (e.g. `feat(auth): add login endpoint`)
+  - Description should be imperative mood, lowercase, no period
+- Each commit must leave the project in a buildable, runnable state
+- Never commit secrets, `.env` files, credentials, or large generated/binary files
+- Write commit messages that explain *why*, not just *what* -- the diff shows what changed
+- Stage related changes together; don't mix unrelated changes in one commit

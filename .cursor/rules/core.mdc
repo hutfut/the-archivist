@@ -1,0 +1,17 @@
+---
+description: Universal code quality standards for all languages and files
+alwaysApply: true
+---
+
+# Code Quality Standards
+
+- Write clean, readable, idiomatic code for the chosen language
+- Prefer explicit over implicit; avoid "magic" that obscures behavior
+- Handle errors properly -- never swallow exceptions or silently fail
+- Use meaningful, descriptive names; avoid abbreviations unless they are domain-standard (e.g. `id`, `url`, `http`)
+- Keep functions small and single-purpose; if a function does two things, split it
+- No dead code, no commented-out code -- use version control instead
+- Include type annotations / type hints where the language supports them
+- Prefer composition over inheritance
+- Keep dependencies minimal; justify each one
+- Reference @DECISIONS.md for architectural context before making structural changes

@@ -1,0 +1,18 @@
+---
+description: Self-review checklist to run before marking work complete
+alwaysApply: true
+---
+
+# Self-Review Before Completion
+
+Before marking any task or feature as complete, review all changes against this checklist:
+
+- [ ] Error handling: Are all failure modes handled? No bare `catch` blocks?
+- [ ] Input validation: Are inputs validated at system boundaries?
+- [ ] Edge cases: Have boundary conditions been considered (empty inputs, nulls, large data, concurrent access)?
+- [ ] Naming: Are all names clear and consistent with the rest of the codebase?
+- [ ] Complexity: Can any part be simplified without losing clarity?
+- [ ] No leftover TODOs/FIXMEs that should be resolved before submission
+- [ ] Public interfaces have clear contracts (documented parameters, return types, error conditions)
+- [ ] No unnecessary dependencies or imports added
+- [ ] Tests pass and cover the new/changed behavior

@@ -1,0 +1,15 @@
+---
+description: Testing standards and expectations for all code
+alwaysApply: true
+---
+
+# Testing Standards
+
+- Write tests alongside implementation, not as an afterthought
+- Test behavior and outcomes, not implementation details -- tests should survive refactors
+- Cover the happy path, edge cases, and error/failure paths
+- Tests should be readable as documentation: a new reader should understand expected behavior from test names and assertions alone
+- Run the full relevant test suite before committing; never commit broken tests
+- Keep tests fast and independent -- no shared mutable state between tests
+- Use descriptive test names that state the scenario and expected outcome (e.g. `test_login_with_expired_token_returns_401`)
+- Mock external dependencies (network, filesystem, databases) at boundaries, not deep inside the code
