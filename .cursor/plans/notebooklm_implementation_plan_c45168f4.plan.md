@@ -285,6 +285,9 @@ Each written before implementing the relevant milestone.
   - Document format badges and file size display
   - Keyboard shortcuts (Enter to send, Ctrl+N for new conversation)
   - Dark mode
+  - Migration/model drift safety: CI check via `alembic check` or `alembic revision --autogenerate` that fails if models and migrations are out of sync
+  - Migration round-trip test: `alembic upgrade head` → `alembic downgrade base` → `alembic upgrade head` to verify the full migration path
+  - Integration test suite that runs against a real PostgreSQL container (via docker-compose or testcontainers) instead of SQLite, exercising the actual Alembic migration path
 
 **Commits**: ~3-4 (error handling, UI polish, README, bonus features)
 
