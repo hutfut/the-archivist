@@ -101,3 +101,39 @@ async def test_upload_pdf_accepted(client: AsyncClient) -> None:
     )
     assert response.status_code == 201
     assert response.json()["filename"] == "doc.pdf"
+
+
+async def test_delete_document_success(client: AsyncClient) -> None:
+    upload = await client.post(
+        "/api/documents",
+        files={"file": ("doomed.txt", b"goodbye", "text/plain")},
+    )
+    doc_id = upload.json()["id"]
+
+    response = await client.delete(f"/api/documents/{doc_id}")
+    assert response.status_code == 204
+
+    listing = await client.get("/api/documents")
+    assert listing.json()["documents"] == []
+
+
+async def test_delete_removes_file_from_disk(
+    client: AsyncClient, test_settings: "Settings"  # noqa: F821
+) -> None:
+    upload = await client.post(
+        "/api/documents",
+        files={"file": ("byebye.txt", b"data", "text/plain")},
+    )
+    doc_id = upload.json()["id"]
+    doc_dir = test_settings.upload_dir / doc_id
+    assert doc_dir.exists()
+
+    await client.delete(f"/api/documents/{doc_id}")
+    assert not doc_dir.exists()
+
+
+async def test_delete_nonexistent_returns_404(client: AsyncClient) -> None:
+    fake_id = str(uuid.uuid4())
+    response = await client.delete(f"/api/documents/{fake_id}")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
