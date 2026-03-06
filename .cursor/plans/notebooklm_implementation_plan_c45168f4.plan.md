@@ -279,8 +279,12 @@ Each written before implementing the relevant milestone.
 - Loading skeletons / spinners
 - Empty states with helpful copy ("Upload a document to get started")
 - **README.md**: setup instructions, architecture overview, design decisions, trade-offs, future improvements
-- **Creative additions** (pick 1-2 based on remaining time):
-  - Source highlighting: click a source attribution to see the relevant chunk in context
+- **Creative additions** (pick based on remaining time):
+  - Background processing with status polling: documents gain a `status` field (`pending`/`processing`/`ready`/`failed`) with `error_message`; upload returns immediately via `BackgroundTasks`, frontend polls `GET /api/documents/{id}` to track progress (no event bus -- single producer/consumer doesn't justify the abstraction)
+  - Duplicate document detection: SHA-256 content hash on upload; 409 Conflict if an identical file already exists
+  - Document statistics: `word_count`, `page_count` (PDFs), `estimated_reading_time_seconds` computed during extraction and returned in the API
+  - Chunk provenance: each chunk stores `start_char`/`end_char` offsets into the extracted text, enabling source highlighting in the document viewer
+  - Source highlighting: click a source attribution to see the relevant chunk in context (builds on chunk provenance)
   - Conversation titles auto-generated from first message
   - Document format badges and file size display
   - Keyboard shortcuts (Enter to send, Ctrl+N for new conversation)
