@@ -33,6 +33,13 @@ async def close_db() -> None:
     _session_factory = None
 
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Return the session factory for use outside of FastAPI dependencies."""
+    if _session_factory is None:
+        raise RuntimeError("Database not initialized — call init_db() first")
+    return _session_factory
+
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency that yields an async database session."""
     if _session_factory is None:

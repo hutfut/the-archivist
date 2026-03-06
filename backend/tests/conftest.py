@@ -6,12 +6,16 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine
 from testcontainers.postgres import PostgresContainer
 
+from app.agent.graph import build_agent_graph
+from app.agent.llm import MockChatModel
+from app.api.conversations import get_agent, init_agent
 from app.config import Settings, get_settings
 from app.db.models import Base
-from app.db.session import close_db, init_db
+from app.db.session import close_db, get_session_factory, init_db
 from app.main import create_app
 from app.services.embedding import MockEmbeddingService
 from app.services.processing import get_processor, init_processor
+from app.services.retrieval import RetrievalService
 
 
 @pytest.fixture(scope="session")
@@ -49,9 +53,21 @@ async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
     mock_embeddings = MockEmbeddingService()
     init_processor(mock_embeddings)
 
+    retrieval_service = RetrievalService(mock_embeddings)
+    mock_llm = MockChatModel()
+    agent_graph = build_agent_graph(
+        retrieval_service=retrieval_service,
+        llm=mock_llm,
+        session_factory=get_session_factory(),
+        similarity_threshold=0.0,
+        top_k=5,
+    )
+    init_agent(agent_graph)
+
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: test_settings
     app.dependency_overrides[get_processor] = lambda: get_processor()
+    app.dependency_overrides[get_agent] = lambda: agent_graph
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
