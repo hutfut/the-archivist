@@ -41,5 +41,6 @@ Trade-offs accepted, follow-on work, risks.
 | 0001 | [Use Python with FastAPI, React, and LangChain/LangGraph](0001-use-python-fastapi-react.md) | 2026-03-06 |
 | 0002 | [Data Storage Strategy](0002-data-storage-strategy.md) | 2026-03-06 |
 | 0003 | [Document Processing and Embedding Approach](0003-document-processing-and-embedding.md) | 2026-03-06 |
+| 0004 | [LangGraph Agent Architecture](0004-langgraph-agent-architecture.md) | 2026-03-06 |
 
 When you add an ADR, append a row to this table.
