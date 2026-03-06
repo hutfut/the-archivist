@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
-from typing import TYPE_CHECKING
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_session
+from app.db.session import get_session, get_session_factory
 from app.models.conversation import (
     ConversationDetailResponse,
     ConversationListResponse,
@@ -20,6 +24,8 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
 
 logger = logging.getLogger(__name__)
+
+STREAM_CHUNK_SIZE = 6
 
 router = APIRouter(prefix="/api", tags=["conversations"])
 
@@ -142,3 +148,97 @@ async def send_message(
     )
 
     return assistant_message
+
+
+def _sse_event(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _chunk_text(text: str, chunk_size: int = STREAM_CHUNK_SIZE) -> list[str]:
+    """Split text into word-groups for simulated token streaming."""
+    words = text.split(" ")
+    chunks: list[str] = []
+    for i in range(0, len(words), chunk_size):
+        piece = " ".join(words[i : i + chunk_size])
+        if chunks:
+            piece = " " + piece
+        chunks.append(piece)
+    return chunks
+
+
+async def _stream_response(
+    conversation_id: str,
+    content: str,
+    agent: CompiledStateGraph,
+) -> AsyncGenerator[str, None]:
+    """Async generator that yields SSE events for a chat message."""
+    session_factory = get_session_factory()
+
+    async with session_factory() as session:
+        conversation = await conversation_service.get_conversation(
+            conversation_id, session
+        )
+        if conversation is None:
+            yield _sse_event("error", {"detail": "Conversation not found"})
+            return
+
+        await conversation_service.add_message(
+            conversation_id=conversation_id,
+            role="user",
+            content=content,
+            session=session,
+        )
+
+        history = await conversation_service.get_conversation_history(
+            conversation_id, session
+        )
+
+    agent_result = await agent.ainvoke({
+        "query": content,
+        "conversation_history": history,
+    })
+
+    response_text: str = agent_result["response"]
+    sources: list[dict[str, Any]] = agent_result.get("sources", [])
+
+    async with session_factory() as session:
+        assistant_message = await conversation_service.add_message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=response_text,
+            session=session,
+            sources=sources,
+        )
+
+        await conversation_service.set_conversation_title(
+            conversation_id, content, session
+        )
+
+    yield _sse_event("message_start", {
+        "message_id": assistant_message.id,
+        "conversation_id": assistant_message.conversation_id,
+    })
+
+    for chunk in _chunk_text(response_text):
+        yield _sse_event("content_delta", {"delta": chunk})
+        await asyncio.sleep(0.02)
+
+    yield _sse_event("sources", {"sources": sources})
+    yield _sse_event("message_end", {"message_id": assistant_message.id})
+
+
+@router.post("/conversations/{conversation_id}/messages/stream")
+async def send_message_stream(
+    conversation_id: str,
+    request: SendMessageRequest,
+    agent: CompiledStateGraph = Depends(get_agent),
+) -> StreamingResponse:
+    return StreamingResponse(
+        _stream_response(conversation_id, request.content, agent),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

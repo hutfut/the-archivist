@@ -4,6 +4,7 @@ These tests hit the HTTP endpoints and exercise the full stack:
 routing -> service -> agent -> database.
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -200,3 +201,97 @@ async def test_delete_conversation_cascades_messages(
 
     resp = await client.get(f"/api/conversations/{conv['id']}")
     assert resp.status_code == 404
+
+
+def _parse_sse_events(body: str) -> list[tuple[str, dict]]:
+    """Parse an SSE response body into a list of (event_type, data) tuples."""
+    events: list[tuple[str, dict]] = []
+    current_event: str | None = None
+    for line in body.splitlines():
+        if line.startswith("event: "):
+            current_event = line[len("event: "):]
+        elif line.startswith("data: ") and current_event is not None:
+            data = json.loads(line[len("data: "):])
+            events.append((current_event, data))
+            current_event = None
+    return events
+
+
+async def test_stream_message_event_sequence(client: AsyncClient) -> None:
+    """SSE stream should emit message_start, content_delta(s), sources, message_end."""
+    conv = await _create_conversation(client)
+
+    resp = await client.post(
+        f"/api/conversations/{conv['id']}/messages/stream",
+        json={"content": "Tell me something"},
+    )
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers["content-type"]
+
+    events = _parse_sse_events(resp.text)
+    event_types = [e[0] for e in events]
+
+    assert event_types[0] == "message_start"
+    assert event_types[-1] == "message_end"
+    assert event_types[-2] == "sources"
+    assert all(t == "content_delta" for t in event_types[1:-2])
+    assert len(event_types) >= 4
+
+    message_id = events[0][1]["message_id"]
+    assert events[-1][1]["message_id"] == message_id
+
+    full_content = "".join(e[1]["delta"] for e in events if e[0] == "content_delta")
+    assert len(full_content) > 0
+
+
+async def test_stream_message_with_documents(client: AsyncClient) -> None:
+    """SSE stream should include source attributions when documents exist."""
+    await _upload_sample_document(client)
+    conv = await _create_conversation(client)
+
+    resp = await client.post(
+        f"/api/conversations/{conv['id']}/messages/stream",
+        json={"content": "What is in the sample?"},
+    )
+    assert resp.status_code == 200
+
+    events = _parse_sse_events(resp.text)
+    sources_events = [e for e in events if e[0] == "sources"]
+    assert len(sources_events) == 1
+    sources = sources_events[0][1]["sources"]
+    assert len(sources) > 0
+    assert "filename" in sources[0]
+
+
+async def test_stream_message_persists(client: AsyncClient) -> None:
+    """Messages sent via streaming should be persisted to the conversation."""
+    conv = await _create_conversation(client)
+
+    resp = await client.post(
+        f"/api/conversations/{conv['id']}/messages/stream",
+        json={"content": "Streaming question"},
+    )
+    assert resp.status_code == 200
+
+    resp = await client.get(f"/api/conversations/{conv['id']}")
+    messages = resp.json()["messages"]
+    assert len(messages) == 2
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Streaming question"
+    assert messages[1]["role"] == "assistant"
+
+
+async def test_stream_message_nonexistent_conversation(
+    client: AsyncClient,
+) -> None:
+    """Streaming to a nonexistent conversation should emit an error event."""
+    resp = await client.post(
+        "/api/conversations/nonexistent-id/messages/stream",
+        json={"content": "Hello"},
+    )
+    assert resp.status_code == 200
+
+    events = _parse_sse_events(resp.text)
+    assert len(events) == 1
+    assert events[0][0] == "error"
+    assert "not found" in events[0][1]["detail"].lower()
