@@ -38,14 +38,14 @@ class Settings:
     )
     similarity_threshold: float = field(
         default_factory=lambda: float(
-            os.environ.get("SIMILARITY_THRESHOLD", "0.1")
+            os.environ.get("SIMILARITY_THRESHOLD", "0.3")
         )
     )
     retrieval_top_k: int = field(
         default_factory=lambda: int(os.environ.get("RETRIEVAL_TOP_K", "5"))
     )
     retrieval_candidate_k: int = field(
-        default_factory=lambda: int(os.environ.get("RETRIEVAL_CANDIDATE_K", "10"))
+        default_factory=lambda: int(os.environ.get("RETRIEVAL_CANDIDATE_K", "20"))
     )
 
 

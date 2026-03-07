@@ -94,6 +94,38 @@ class TestOverlapFiltering:
         assert len(result) == 2
 
 
+class TestSubstringDedup:
+    def test_exact_substring_drops_lower_scored(self):
+        full_text = "The Witch specializes in occult spells and minion summoning."
+        partial = "occult spells and minion summoning"
+        chunks = [
+            _chunk(doc_id="d1", index=0, content=full_text, score=0.9),
+            _chunk(doc_id="d2", index=0, content=partial, score=0.8),
+        ]
+        result = deduplicate_chunks(chunks, final_k=5)
+        assert len(result) == 1
+        assert result[0].chunk_content == full_text
+
+    def test_substring_keeps_higher_scored_even_if_shorter(self):
+        long_text = "The Witch is a character class in the game with many abilities."
+        short_text = "The Witch is a character class"
+        chunks = [
+            _chunk(doc_id="d1", index=0, content=short_text, score=0.95),
+            _chunk(doc_id="d2", index=0, content=long_text, score=0.6),
+        ]
+        result = deduplicate_chunks(chunks, final_k=5)
+        assert len(result) == 1
+        assert result[0].similarity_score == 0.95
+
+    def test_non_substring_different_content_kept(self):
+        chunks = [
+            _chunk(doc_id="d1", index=0, content="Witch uses occult spells.", score=0.9),
+            _chunk(doc_id="d2", index=0, content="Ranger uses bow skills.", score=0.8),
+        ]
+        result = deduplicate_chunks(chunks, final_k=5)
+        assert len(result) == 2
+
+
 class TestDeduplicateChunks:
     def test_no_duplicates_returns_input_unchanged(self):
         chunks = [

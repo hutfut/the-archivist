@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_OVERLAP_THRESHOLD = 0.70
+_OVERLAP_THRESHOLD = 0.60
 
 
 @dataclass(frozen=True)
@@ -80,13 +80,33 @@ def _merge_adjacent_chunks(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]
     return merged
 
 
+def _is_substring_of_existing(text: str, existing_texts: list[str]) -> bool:
+    """Check if text is a substring of any existing text (or vice versa)."""
+    normalized = text.strip().lower()
+    for existing in existing_texts:
+        existing_norm = existing.strip().lower()
+        if normalized in existing_norm or existing_norm in normalized:
+            return True
+    return False
+
+
 def _drop_overlapping(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
-    """Drop lower-scoring chunks whose content overlaps >70% with a higher-scoring chunk."""
+    """Drop lower-scoring chunks that overlap with a higher-scoring chunk.
+
+    Two-pass filtering:
+    1. Substring containment -- if chunk A's content is contained within
+       chunk B's (or vice versa), drop the lower-scored one.
+    2. Jaccard token overlap -- drop chunks exceeding the overlap threshold.
+    """
     scored = sorted(chunks, key=lambda c: c.similarity_score, reverse=True)
     kept: list[RetrievedChunk] = []
     kept_tokens: list[set[str]] = []
+    kept_texts: list[str] = []
 
     for chunk in scored:
+        if _is_substring_of_existing(chunk.chunk_content, kept_texts):
+            continue
+
         tokens = _token_set(chunk.chunk_content)
         is_duplicate = any(
             _jaccard_similarity(tokens, existing) > _OVERLAP_THRESHOLD
@@ -95,6 +115,7 @@ def _drop_overlapping(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
         if not is_duplicate:
             kept.append(chunk)
             kept_tokens.append(tokens)
+            kept_texts.append(chunk.chunk_content)
 
     return kept
 
@@ -106,8 +127,9 @@ def deduplicate_chunks(
     """Remove near-duplicate chunks via adjacent merging and overlap filtering.
 
     1. Merge consecutive same-document chunks into single blocks.
-    2. Drop chunks with >70% Jaccard token overlap (keep higher-scored).
-    3. Return top final_k by similarity score.
+    2. Drop chunks where one is a substring of another (keep higher-scored).
+    3. Drop chunks with >60% Jaccard token overlap (keep higher-scored).
+    4. Return top final_k by similarity score.
     """
     if len(chunks) <= 1:
         return list(chunks)
