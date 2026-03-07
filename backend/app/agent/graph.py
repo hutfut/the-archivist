@@ -58,16 +58,26 @@ def _build_retrieve_node(
 
 def _build_grade_node(similarity_threshold: float) -> Any:
     def grade_relevance(state: AgentState) -> dict:
+        retrieved = state["retrieved_chunks"]
+        for chunk in retrieved:
+            logger.debug(
+                "Chunk %d (%.80s): similarity=%.4f %s",
+                chunk.chunk_index,
+                chunk.chunk_content.replace("\n", " "),
+                chunk.similarity_score,
+                "PASS" if chunk.similarity_score >= similarity_threshold else "FAIL",
+            )
         relevant = [
             chunk
-            for chunk in state["retrieved_chunks"]
+            for chunk in retrieved
             if chunk.similarity_score >= similarity_threshold
         ]
         logger.info(
-            "Graded %d/%d chunks as relevant (threshold=%.2f)",
+            "Graded %d/%d chunks as relevant (threshold=%.2f, top_score=%.4f)",
             len(relevant),
-            len(state["retrieved_chunks"]),
+            len(retrieved),
             similarity_threshold,
+            max((c.similarity_score for c in retrieved), default=0.0),
         )
         if not relevant:
             return {
