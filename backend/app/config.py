@@ -44,6 +44,9 @@ class Settings:
     retrieval_top_k: int = field(
         default_factory=lambda: int(os.environ.get("RETRIEVAL_TOP_K", "5"))
     )
+    retrieval_candidate_k: int = field(
+        default_factory=lambda: int(os.environ.get("RETRIEVAL_CANDIDATE_K", "10"))
+    )
 
 
 @lru_cache(maxsize=1)
