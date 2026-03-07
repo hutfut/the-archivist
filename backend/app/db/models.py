@@ -36,6 +36,7 @@ class Chunk(Base):
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    section_heading: Mapped[str | None] = mapped_column(String, nullable=True)
     embedding = mapped_column(Vector(384), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
