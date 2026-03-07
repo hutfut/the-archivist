@@ -1,3 +1,10 @@
 {
-    "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python"
-  }
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "terminal.integrated.defaultProfile.linux": "Python (venv)",
+  "terminal.integrated.profiles.linux": {
+    "Python (venv)": {
+      "path": "bash",
+      "args": ["-c", "source backend/.venv/bin/activate && exec bash"]
+    }
+  },
+}

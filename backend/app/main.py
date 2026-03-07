@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         similarity_threshold=settings.similarity_threshold,
         top_k=settings.retrieval_top_k,
         candidate_k=settings.retrieval_candidate_k,
+        query_rewrite=settings.llm_provider != "mock",
     )
     init_agent(agent_graph)
 

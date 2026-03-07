@@ -27,11 +27,47 @@ _SYSTEM_PROMPT = (
 
 class AgentState(TypedDict):
     query: str
+    search_queries: list[str]
     conversation_history: list[dict[str, str]]
     retrieved_chunks: list[RetrievedChunk]
     relevant_chunks: list[RetrievedChunk]
     response: str
     sources: list[dict[str, Any]]
+
+
+_REWRITE_PROMPT = (
+    "You are a search query optimizer for a document retrieval system. "
+    "Given the user's question, generate 2-3 alternative search queries "
+    "that would help find relevant information. Each query should approach "
+    "the topic from a different angle or use different keywords.\n\n"
+    "Return ONLY the queries, one per line. No numbering, no explanations."
+)
+
+
+def _build_rewrite_node(llm: BaseChatModel, enabled: bool) -> Any:
+    def rewrite_query(state: AgentState) -> dict:
+        original = state["query"]
+
+        if not enabled:
+            return {"search_queries": [original]}
+
+        messages = [
+            SystemMessage(content=_REWRITE_PROMPT),
+            HumanMessage(content=original),
+        ]
+        result = llm.invoke(messages)
+        raw_text = str(result.content).strip()
+        alternatives = [line.strip() for line in raw_text.splitlines() if line.strip()]
+
+        queries = [original] + alternatives
+        logger.info(
+            "Rewrote query into %d search queries: %s",
+            len(queries),
+            queries,
+        )
+        return {"search_queries": queries}
+
+    return rewrite_query
 
 
 def _build_retrieve_node(
@@ -41,19 +77,29 @@ def _build_retrieve_node(
     session_factory: Any,
 ) -> Any:
     async def retrieve_documents(state: AgentState) -> dict:
+        queries = state.get("search_queries") or [state["query"]]
+
+        all_chunks: list[RetrievedChunk] = []
         async with session_factory() as session:
-            chunks = await retrieval_service.search(
-                query=state["query"],
-                session=session,
-                top_k=top_k,
-                candidate_k=candidate_k,
-            )
+            for q in queries:
+                chunks = await retrieval_service.search(
+                    query=q,
+                    session=session,
+                    top_k=top_k,
+                    candidate_k=candidate_k,
+                )
+                all_chunks.extend(chunks)
+
+        if len(queries) > 1:
+            from app.services.retrieval import deduplicate_chunks
+            all_chunks = deduplicate_chunks(all_chunks, final_k=top_k)
+
         logger.info(
-            "Retrieved %d chunks for query: %.80s",
-            len(chunks),
-            state["query"],
+            "Retrieved %d chunks for %d search queries",
+            len(all_chunks),
+            len(queries),
         )
-        return {"retrieved_chunks": chunks}
+        return {"retrieved_chunks": all_chunks}
 
     return retrieve_documents
 
@@ -153,20 +199,24 @@ def build_agent_graph(
     similarity_threshold: float = 0.3,
     top_k: int = 5,
     candidate_k: int = 10,
+    query_rewrite: bool = False,
 ) -> CompiledStateGraph:
     """Build and compile the RAG agent graph.
 
-    The graph has three nodes:
-      1. retrieve_documents -- query pgvector for similar chunks (over-fetches
-         candidate_k, deduplicates down to top_k)
-      2. grade_relevance -- filter chunks below the similarity threshold
-      3. generate_response -- pass relevant chunks to the LLM
+    The graph has four nodes:
+      1. rewrite_query -- reformulate the user query into search-optimized
+         variations (passthrough when query_rewrite is disabled)
+      2. retrieve_documents -- query the vector/keyword store for similar
+         chunks, merging results across multiple search queries
+      3. grade_relevance -- filter chunks below the similarity threshold
+      4. generate_response -- pass relevant chunks to the LLM
 
     If no chunks pass the grade, the graph short-circuits with a
     "no relevant documents" response.
     """
     graph = StateGraph(AgentState)
 
+    graph.add_node("rewrite_query", _build_rewrite_node(llm, enabled=query_rewrite))
     graph.add_node(
         "retrieve_documents",
         _build_retrieve_node(retrieval_service, top_k, candidate_k, session_factory),
@@ -174,7 +224,8 @@ def build_agent_graph(
     graph.add_node("grade_relevance", _build_grade_node(similarity_threshold))
     graph.add_node("generate_response", _build_generate_node(llm))
 
-    graph.set_entry_point("retrieve_documents")
+    graph.set_entry_point("rewrite_query")
+    graph.add_edge("rewrite_query", "retrieve_documents")
     graph.add_edge("retrieve_documents", "grade_relevance")
     graph.add_conditional_edges(
         "grade_relevance",

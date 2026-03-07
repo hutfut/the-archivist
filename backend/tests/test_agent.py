@@ -226,3 +226,43 @@ async def test_source_attributions_structure(
         assert "chunk_content" in source
         assert "similarity_score" in source
         assert isinstance(source["similarity_score"], float)
+
+
+async def test_rewrite_node_passthrough_when_disabled(
+    mock_llm: MockChatModel,
+    high_relevance_chunks: list[RetrievedChunk],
+) -> None:
+    """With query_rewrite=False, the original query is passed through unchanged."""
+    retrieval = _mock_retrieval_service(high_relevance_chunks)
+    session_factory = _mock_session_factory()
+    graph = build_agent_graph(
+        retrieval_service=retrieval,
+        llm=mock_llm,
+        session_factory=session_factory,
+        query_rewrite=False,
+    )
+
+    result = await graph.ainvoke(
+        {"query": "What is the capital of France?", "conversation_history": []}
+    )
+
+    assert result["search_queries"] == ["What is the capital of France?"]
+    assert result["response"]
+    assert len(result["sources"]) > 0
+
+
+async def test_graph_has_four_nodes(mock_llm: MockChatModel) -> None:
+    retrieval = _mock_retrieval_service([])
+    session_factory = _mock_session_factory()
+    graph = build_agent_graph(
+        retrieval_service=retrieval,
+        llm=mock_llm,
+        session_factory=session_factory,
+    )
+    node_names = set(graph.get_graph().nodes.keys()) - {"__start__", "__end__"}
+    assert node_names == {
+        "rewrite_query",
+        "retrieve_documents",
+        "grade_relevance",
+        "generate_response",
+    }
