@@ -1,3 +1,4 @@
+import logging
 from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
@@ -8,6 +9,8 @@ from app.db.session import get_session
 from app.models.document import DocumentListResponse, DocumentResponse
 from app.services import document_service
 from app.services.processing import DocumentProcessor, get_processor
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["documents"])
 
@@ -23,6 +26,7 @@ def _validate_upload(file: UploadFile, settings: Settings) -> None:
     extension = PurePosixPath(file.filename).suffix.lower()
     if extension not in settings.allowed_extensions:
         allowed = ", ".join(sorted(settings.allowed_extensions))
+        logger.warning("Rejected upload: unsupported extension %s (%s)", extension, file.filename)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported file type: {extension}. Allowed: {allowed}",
@@ -44,13 +48,16 @@ async def upload_document(
 
     first_chunk = await file.read(1)
     if not first_chunk:
+        logger.warning("Rejected upload: empty file (%s)", file.filename)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File is empty",
         )
     await file.seek(0)
 
-    return await document_service.save_document(file, session, settings, processor)
+    result = await document_service.save_document(file, session, settings, processor)
+    logger.info("Uploaded document %s (%s, %d bytes)", result.id, result.filename, result.file_size)
+    return result
 
 
 @router.get("/documents", response_model=DocumentListResponse)
@@ -76,3 +83,4 @@ async def delete_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
         )
+    logger.info("Deleted document %s", document_id)

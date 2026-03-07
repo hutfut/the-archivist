@@ -51,7 +51,9 @@ def get_agent() -> CompiledStateGraph:
 async def create_conversation(
     session: AsyncSession = Depends(get_session),
 ) -> ConversationResponse:
-    return await conversation_service.create_conversation(session)
+    result = await conversation_service.create_conversation(session)
+    logger.info("Created conversation %s", result.id)
+    return result
 
 
 @router.get("/conversations", response_model=ConversationListResponse)
@@ -97,6 +99,7 @@ async def delete_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found",
         )
+    logger.info("Deleted conversation %s", conversation_id)
 
 
 @router.post(
@@ -118,6 +121,8 @@ async def send_message(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found",
         )
+
+    logger.info("Message received for conversation %s (%d chars)", conversation_id, len(request.content))
 
     await conversation_service.add_message(
         conversation_id=conversation_id,
@@ -172,6 +177,7 @@ async def _stream_response(
     agent: CompiledStateGraph,
 ) -> AsyncGenerator[str, None]:
     """Async generator that yields SSE events for a chat message."""
+    logger.info("Stream started for conversation %s (%d chars)", conversation_id, len(content))
     session_factory = get_session_factory()
 
     async with session_factory() as session:
@@ -179,6 +185,7 @@ async def _stream_response(
             conversation_id, session
         )
         if conversation is None:
+            logger.warning("Stream aborted: conversation %s not found", conversation_id)
             yield _sse_event("error", {"detail": "Conversation not found"})
             return
 
@@ -225,6 +232,7 @@ async def _stream_response(
 
     yield _sse_event("sources", {"sources": sources})
     yield _sse_event("message_end", {"message_id": assistant_message.id})
+    logger.info("Stream completed for conversation %s (message %s)", conversation_id, assistant_message.id)
 
 
 @router.post("/conversations/{conversation_id}/messages/stream")
