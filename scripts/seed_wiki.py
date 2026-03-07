@@ -62,20 +62,30 @@ def discover_page_titles(client: httpx.Client) -> list[str]:
 
 def fetch_page_html(client: httpx.Client, title: str) -> str | None:
     """Fetch rendered HTML for a single wiki page. Returns None on failure."""
-    resp = client.get(
-        WIKI_API,
-        params={
-            "action": "parse",
-            "page": title,
-            "prop": "text",
-            "format": "json",
-        },
-    )
+    try:
+        resp = client.get(
+            WIKI_API,
+            params={
+                "action": "parse",
+                "page": title,
+                "prop": "text",
+                "format": "json",
+            },
+        )
+    except httpx.RequestError as exc:
+        logger.warning("Request failed for '%s': %s", title, exc)
+        return None
+
     if resp.status_code != 200:
         logger.warning("HTTP %d fetching page '%s'", resp.status_code, title)
         return None
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError:
+        logger.warning("Invalid JSON response for '%s' (len=%d)", title, len(resp.content))
+        return None
+
     if "error" in data:
         logger.warning("API error for '%s': %s", title, data["error"].get("info"))
         return None
