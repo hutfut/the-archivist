@@ -1,5 +1,10 @@
 from app.services.embedding import EMBEDDING_DIMENSION, MockEmbeddingService
-from app.services.processing import chunk_text
+from app.services.processing import (
+    DEFAULT_CHUNK_SIZE,
+    ChunkWithHeading,
+    chunk_markdown,
+    chunk_text,
+)
 
 
 class TestChunking:
@@ -27,12 +32,82 @@ class TestChunking:
         chunks = chunk_text("")
         assert chunks == []
 
-    def test_default_parameters(self):
-        text = "Hello world. " * 100  # ~1300 characters
+    def test_default_parameters_use_updated_size(self):
+        assert DEFAULT_CHUNK_SIZE == 1000
+        text = "Hello world. " * 200  # ~2600 characters
         chunks = chunk_text(text)
         assert len(chunks) >= 2
         for chunk in chunks:
-            assert len(chunk) <= 500
+            assert len(chunk) <= DEFAULT_CHUNK_SIZE
+
+
+class TestMarkdownChunking:
+    def test_multi_section_produces_one_chunk_per_section(self):
+        md = (
+            "# Title\n\nIntro paragraph.\n\n"
+            "## Section A\n\nContent of section A.\n\n"
+            "## Section B\n\nContent of section B.\n"
+        )
+        chunks = chunk_markdown(md)
+        assert len(chunks) >= 2
+        assert all(isinstance(c, ChunkWithHeading) for c in chunks)
+
+        headings = [c.section_heading for c in chunks]
+        assert any(h and "Section A" in h for h in headings)
+        assert any(h and "Section B" in h for h in headings)
+
+    def test_heading_hierarchy_concatenated(self):
+        md = (
+            "# Top\n\n"
+            "## Middle\n\n"
+            "### Deep\n\nDeep content here.\n"
+        )
+        chunks = chunk_markdown(md)
+        deep_chunks = [c for c in chunks if c.section_heading and "Deep" in c.section_heading]
+        assert len(deep_chunks) >= 1
+        assert deep_chunks[0].section_heading == "Top > Middle > Deep"
+
+    def test_oversized_section_gets_sub_split(self):
+        long_content = "This is a sentence with some words. " * 100  # ~3600 chars
+        md = f"# Big Section\n\n{long_content}"
+        chunks = chunk_markdown(md, chunk_size=500)
+        assert len(chunks) >= 2
+        for c in chunks:
+            assert c.section_heading == "Big Section"
+            assert len(c.content) <= 500
+
+    def test_deep_headings_stay_within_parent(self):
+        md = (
+            "# Top\n\n"
+            "## Parent\n\n"
+            "#### Deep Sub\n\nDeep sub content.\n\n"
+            "Some more parent content.\n"
+        )
+        chunks = chunk_markdown(md)
+        for c in chunks:
+            if c.content and "Deep sub content" in c.content:
+                assert c.section_heading is not None
+                assert "Deep Sub" not in c.section_heading
+
+    def test_no_headers_falls_back_to_plain_chunking(self):
+        text = "Just plain text without any markdown headers. " * 50
+        chunks = chunk_markdown(text)
+        assert len(chunks) >= 1
+        assert all(c.section_heading is None for c in chunks)
+
+    def test_empty_markdown(self):
+        chunks = chunk_markdown("")
+        assert chunks == []
+
+    def test_whitespace_only_markdown(self):
+        chunks = chunk_markdown("   \n\n  ")
+        assert chunks == []
+
+    def test_section_content_preserved(self):
+        md = "# Title\n\nThe quick brown fox jumps over the lazy dog."
+        chunks = chunk_markdown(md)
+        all_content = " ".join(c.content for c in chunks)
+        assert "quick brown fox" in all_content
 
 
 class TestMockEmbeddingService:
