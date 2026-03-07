@@ -5,6 +5,7 @@ export interface SourceAttribution {
   filename: string;
   chunk_content: string;
   similarity_score: number;
+  section_heading: string | null;
 }
 
 export interface MessageResponse {

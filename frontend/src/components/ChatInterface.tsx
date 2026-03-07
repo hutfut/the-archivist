@@ -285,7 +285,9 @@ function SourceItem({
         className="w-full text-left text-xs cursor-pointer"
       >
         <span className="font-medium text-blue-600 dark:text-blue-400">
-          {source.filename}
+          {source.section_heading
+            ? `${source.filename} > ${source.section_heading}`
+            : source.filename}
         </span>
         <span className="text-gray-400 dark:text-gray-500 ml-2">
           ({(source.similarity_score * 100).toFixed(0)}% match)

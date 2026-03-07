@@ -37,6 +37,7 @@ class AgentState(TypedDict):
 def _build_retrieve_node(
     retrieval_service: RetrievalService,
     top_k: int,
+    candidate_k: int,
     session_factory: Any,
 ) -> Any:
     async def retrieve_documents(state: AgentState) -> dict:
@@ -45,6 +46,7 @@ def _build_retrieve_node(
                 query=state["query"],
                 session=session,
                 top_k=top_k,
+                candidate_k=candidate_k,
             )
         logger.info(
             "Retrieved %d chunks for query: %.80s",
@@ -96,8 +98,12 @@ def _build_generate_node(llm: BaseChatModel) -> Any:
 
         context_parts = []
         for chunk in chunks:
+            if chunk.section_heading:
+                source_label = f"{chunk.filename} > {chunk.section_heading}"
+            else:
+                source_label = chunk.filename
             context_parts.append(
-                f"[Source: {chunk.filename}]\n{chunk.chunk_content}"
+                f"[Source: {source_label}]\n{chunk.chunk_content}"
             )
         context_text = "\n\n---\n\n".join(context_parts)
 
@@ -124,6 +130,7 @@ def _build_generate_node(llm: BaseChatModel) -> Any:
                 "filename": chunk.filename,
                 "chunk_content": chunk.chunk_content,
                 "similarity_score": chunk.similarity_score,
+                "section_heading": chunk.section_heading,
             }
             for chunk in chunks
         ]
@@ -145,11 +152,13 @@ def build_agent_graph(
     session_factory: Any,
     similarity_threshold: float = 0.3,
     top_k: int = 5,
+    candidate_k: int = 10,
 ) -> CompiledStateGraph:
     """Build and compile the RAG agent graph.
 
     The graph has three nodes:
-      1. retrieve_documents -- query pgvector for similar chunks
+      1. retrieve_documents -- query pgvector for similar chunks (over-fetches
+         candidate_k, deduplicates down to top_k)
       2. grade_relevance -- filter chunks below the similarity threshold
       3. generate_response -- pass relevant chunks to the LLM
 
@@ -160,7 +169,7 @@ def build_agent_graph(
 
     graph.add_node(
         "retrieve_documents",
-        _build_retrieve_node(retrieval_service, top_k, session_factory),
+        _build_retrieve_node(retrieval_service, top_k, candidate_k, session_factory),
     )
     graph.add_node("grade_relevance", _build_grade_node(similarity_threshold))
     graph.add_node("generate_response", _build_generate_node(llm))

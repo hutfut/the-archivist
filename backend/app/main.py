@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         session_factory=get_session_factory(),
         similarity_threshold=settings.similarity_threshold,
         top_k=settings.retrieval_top_k,
+        candidate_k=settings.retrieval_candidate_k,
     )
     init_agent(agent_graph)
 

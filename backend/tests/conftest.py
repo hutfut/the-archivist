@@ -59,8 +59,9 @@ async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
         retrieval_service=retrieval_service,
         llm=mock_llm,
         session_factory=get_session_factory(),
-        similarity_threshold=0.0,
+        similarity_threshold=-1.0,
         top_k=5,
+        candidate_k=10,
     )
     init_agent(agent_graph)
 
