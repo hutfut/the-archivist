@@ -177,3 +177,30 @@ async def test_delete_cascades_to_chunks(client: AsyncClient) -> None:
 
     response = await client.delete(f"/api/documents/{doc_id}")
     assert response.status_code == 204
+
+
+async def test_upload_file_exceeding_max_size_rejected(
+    client: AsyncClient, test_settings: "Settings"  # noqa: F821
+) -> None:
+    """Uploads larger than max_upload_bytes should return 400."""
+    oversized = b"x" * (test_settings.max_upload_bytes + 1)
+    response = await client.post(
+        "/api/documents",
+        files={"file": ("big.txt", oversized, "text/plain")},
+    )
+    assert response.status_code == 400
+    assert "too large" in response.json()["detail"].lower()
+
+
+async def test_upload_md_with_wrong_mime_still_processed_as_markdown(
+    client: AsyncClient,
+) -> None:
+    """Content type should be derived from extension, not client MIME header."""
+    md_content = b"# Title\n\nSome markdown content here."
+    response = await client.post(
+        "/api/documents",
+        files={"file": ("doc.md", md_content, "text/plain")},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["content_type"] == "text/markdown"

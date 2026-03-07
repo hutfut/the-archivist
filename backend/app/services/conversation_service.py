@@ -130,13 +130,23 @@ async def set_conversation_title(
 
 
 async def get_conversation_history(
-    conversation_id: str, session: AsyncSession
+    conversation_id: str,
+    session: AsyncSession,
+    max_messages: int | None = None,
 ) -> list[dict[str, str]]:
-    """Load conversation messages as simple dicts for the agent."""
-    result = await session.execute(
+    """Load recent conversation messages as simple dicts for the agent.
+
+    When max_messages is set, only the most recent N messages are returned.
+    This prevents unbounded context growth in long conversations.
+    """
+    stmt = (
         select(Message)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
+        .order_by(Message.created_at.desc())
     )
-    messages = result.scalars().all()
+    if max_messages is not None:
+        stmt = stmt.limit(max_messages)
+
+    result = await session.execute(stmt)
+    messages = list(reversed(result.scalars().all()))
     return [{"role": m.role, "content": m.content} for m in messages]

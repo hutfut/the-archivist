@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import Settings, get_settings
 from app.db.session import get_session, get_session_factory
 from app.models.conversation import (
     ConversationDetailResponse,
@@ -111,6 +112,7 @@ async def send_message(
     conversation_id: str,
     request: SendMessageRequest,
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> MessageResponse:
     conversation = await conversation_service.get_conversation(
@@ -132,7 +134,7 @@ async def send_message(
     )
 
     history = await conversation_service.get_conversation_history(
-        conversation_id, session
+        conversation_id, session, max_messages=settings.max_history_messages,
     )
 
     agent_result = await agent.ainvoke({
@@ -175,6 +177,7 @@ async def _stream_response(
     conversation_id: str,
     content: str,
     agent: CompiledStateGraph,
+    max_history_messages: int,
 ) -> AsyncGenerator[str, None]:
     """Async generator that yields SSE events for a chat message."""
     logger.info("Stream started for conversation %s (%d chars)", conversation_id, len(content))
@@ -197,7 +200,7 @@ async def _stream_response(
         )
 
         history = await conversation_service.get_conversation_history(
-            conversation_id, session
+            conversation_id, session, max_messages=max_history_messages,
         )
 
     agent_result = await agent.ainvoke({
@@ -239,10 +242,11 @@ async def _stream_response(
 async def send_message_stream(
     conversation_id: str,
     request: SendMessageRequest,
+    settings: Settings = Depends(get_settings),
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> StreamingResponse:
     return StreamingResponse(
-        _stream_response(conversation_id, request.content, agent),
+        _stream_response(conversation_id, request.content, agent, settings.max_history_messages),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

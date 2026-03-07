@@ -295,3 +295,25 @@ async def test_stream_message_nonexistent_conversation(
     assert len(events) == 1
     assert events[0][0] == "error"
     assert "not found" in events[0][1]["detail"].lower()
+
+
+async def test_conversation_history_truncated(client: AsyncClient) -> None:
+    """get_conversation_history with max_messages should only return recent messages."""
+    from app.db.session import get_session_factory
+    from app.services.conversation_service import (
+        add_message,
+        get_conversation_history,
+    )
+
+    conv = await _create_conversation(client)
+    session_factory = get_session_factory()
+
+    async with session_factory() as session:
+        for i in range(6):
+            await add_message(conv["id"], "user", f"msg-{i}", session)
+
+        history = await get_conversation_history(conv["id"], session, max_messages=4)
+
+    assert len(history) == 4
+    assert history[0]["content"] == "msg-2"
+    assert history[-1]["content"] == "msg-5"

@@ -46,13 +46,25 @@ async def upload_document(
 ) -> DocumentResponse:
     _validate_upload(file, settings)
 
-    first_chunk = await file.read(1)
-    if not first_chunk:
+    content = await file.read()
+    if not content:
         logger.warning("Rejected upload: empty file (%s)", file.filename)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File is empty",
         )
+
+    if len(content) > settings.max_upload_bytes:
+        max_mb = settings.max_upload_bytes / (1024 * 1024)
+        logger.warning(
+            "Rejected upload: %s is %d bytes (max %.0f MB)",
+            file.filename, len(content), max_mb,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large ({len(content)} bytes). Maximum is {max_mb:.0f} MB.",
+        )
+
     await file.seek(0)
 
     result = await document_service.save_document(file, session, settings, processor)

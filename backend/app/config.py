@@ -56,6 +56,16 @@ class Settings:
     retrieval_mode: str = field(
         default_factory=lambda: os.environ.get("RETRIEVAL_MODE", "hybrid")
     )
+    max_upload_bytes: int = field(
+        default_factory=lambda: int(
+            os.environ.get("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024))
+        )
+    )
+    max_history_messages: int = field(
+        default_factory=lambda: int(
+            os.environ.get("MAX_HISTORY_MESSAGES", "50")
+        )
+    )
 
 
 @lru_cache(maxsize=1)

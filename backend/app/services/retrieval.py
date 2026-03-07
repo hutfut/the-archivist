@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 from sqlalchemy.sql.elements import ColumnElement
-from sqlalchemy.sql.expression import literal_column
 
 from app.db.models import Chunk, Document
 
@@ -209,12 +208,8 @@ class RetrievalService:
         candidate_k: int,
     ) -> list[RetrievedChunk]:
         query_embedding = self._embedding_service.embed_query(query)
-        embedding_literal = f"[{','.join(str(v) for v in query_embedding)}]"
-
-        distance_expr = f"chunks.embedding <=> '{embedding_literal}'::vector"
-        similarity_expr = literal_column(
-            f"(1 - ({distance_expr}))"
-        ).label("similarity")
+        distance = Chunk.embedding.cosine_distance(query_embedding)
+        similarity = (1 - distance).label("similarity")
 
         stmt = (
             select(
@@ -223,10 +218,10 @@ class RetrievalService:
                 Chunk.content,
                 Chunk.chunk_index,
                 Chunk.section_heading,
-                similarity_expr,
+                similarity,
             )
             .join(Document, Chunk.document_id == Document.id)
-            .order_by(literal_column(distance_expr))
+            .order_by(distance)
             .limit(candidate_k)
         )
 

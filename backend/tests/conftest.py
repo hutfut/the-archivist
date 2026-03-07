@@ -45,6 +45,7 @@ async def test_settings(tmp_path: Path, database_url: str) -> Settings:
     return Settings(
         database_url=database_url,
         upload_dir=upload_dir,
+        max_upload_bytes=1024 * 1024,
     )
 
 
