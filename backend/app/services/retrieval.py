@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, replace
 from functools import reduce
@@ -207,7 +208,7 @@ class RetrievalService:
         session: AsyncSession,
         candidate_k: int,
     ) -> list[RetrievedChunk]:
-        query_embedding = self._embedding_service.embed_query(query)
+        query_embedding = await asyncio.to_thread(self._embedding_service.embed_query, query)
         distance = Chunk.embedding.cosine_distance(query_embedding)
         similarity = (1 - distance).label("similarity")
 

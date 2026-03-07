@@ -135,16 +135,25 @@ async def send_message(
         role="user",
         content=request.content,
         session=session,
+        commit=False,
     )
 
     history = await conversation_service.get_conversation_history(
         conversation_id, session, max_messages=settings.max_history_messages,
     )
 
-    agent_result = await agent.ainvoke({
-        "query": request.content,
-        "conversation_history": history,
-    })
+    try:
+        agent_result = await agent.ainvoke({
+            "query": request.content,
+            "conversation_history": history,
+        })
+    except Exception:
+        logger.exception("Agent failed for conversation %s", conversation_id)
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The AI agent failed to generate a response. Please try again.",
+        )
 
     assistant_message = await conversation_service.add_message(
         conversation_id=conversation_id,
@@ -152,12 +161,14 @@ async def send_message(
         content=agent_result["response"],
         session=session,
         sources=agent_result.get("sources"),
+        commit=False,
     )
 
     await conversation_service.set_conversation_title(
-        conversation_id, request.content, session
+        conversation_id, request.content, session, commit=False,
     )
 
+    await session.commit()
     return assistant_message
 
 
@@ -208,32 +219,41 @@ async def _stream_response(
             role="user",
             content=content,
             session=session,
+            commit=False,
         )
 
         history = await conversation_service.get_conversation_history(
             conversation_id, session, max_messages=max_history_messages,
         )
 
-    agent_result = await agent.ainvoke({
-        "query": content,
-        "conversation_history": history,
-    })
+        try:
+            agent_result = await agent.ainvoke({
+                "query": content,
+                "conversation_history": history,
+            })
+        except Exception:
+            logger.exception("Agent failed during stream for conversation %s", conversation_id)
+            await session.rollback()
+            yield _sse_event("error", {"detail": "The AI agent failed to generate a response."})
+            return
 
-    response_text: str = agent_result["response"]
-    sources: list[dict[str, Any]] = agent_result.get("sources", [])
+        response_text: str = agent_result["response"]
+        sources: list[dict[str, Any]] = agent_result.get("sources", [])
 
-    async with session_factory() as session:
         assistant_message = await conversation_service.add_message(
             conversation_id=conversation_id,
             role="assistant",
             content=response_text,
             session=session,
             sources=sources,
+            commit=False,
         )
 
         await conversation_service.set_conversation_title(
-            conversation_id, content, session
+            conversation_id, content, session, commit=False,
         )
+
+        await session.commit()
 
     yield _sse_event("message_start", {
         "message_id": assistant_message.id,

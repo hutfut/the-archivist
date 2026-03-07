@@ -104,6 +104,7 @@ async def add_message(
     content: str,
     session: AsyncSession,
     sources: list[dict[str, Any]] | None = None,
+    commit: bool = True,
 ) -> MessageResponse:
     now = datetime.now(timezone.utc)
     message = Message(
@@ -116,23 +117,28 @@ async def add_message(
     )
     session.add(message)
 
-    # Update conversation's updated_at timestamp
     conversation = await get_conversation(conversation_id, session)
     if conversation is not None:
         conversation.updated_at = now
 
-    await session.commit()
-    await session.refresh(message)
+    if commit:
+        await session.commit()
+        await session.refresh(message)
+    else:
+        await session.flush()
+
     return MessageResponse.model_validate(message)
 
 
 async def set_conversation_title(
-    conversation_id: str, title: str, session: AsyncSession
+    conversation_id: str, title: str, session: AsyncSession,
+    commit: bool = True,
 ) -> None:
     conversation = await get_conversation(conversation_id, session)
     if conversation is not None and conversation.title is None:
         conversation.title = title[:MAX_TITLE_LENGTH]
-        await session.commit()
+        if commit:
+            await session.commit()
 
 
 async def get_conversation_history(

@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
-from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,21 +22,20 @@ def _resolve_content_type(filename: str) -> str:
 
 
 async def save_document(
-    file: UploadFile,
+    filename: str,
+    content: bytes,
     session: AsyncSession,
     settings: Settings,
     processor: DocumentProcessor,
 ) -> DocumentResponse:
-    """Persist an uploaded file to disk, process it, and record metadata."""
+    """Persist uploaded file bytes to disk, process them, and record metadata."""
     doc_id = str(uuid.uuid4())
-    filename = file.filename or "unnamed"
     content_type = _resolve_content_type(filename)
 
     doc_dir = settings.upload_dir / doc_id
     doc_dir.mkdir(parents=True, exist_ok=True)
     file_path = doc_dir / filename
 
-    content = await file.read()
     file_path.write_bytes(content)
 
     now = datetime.now(timezone.utc)
@@ -108,8 +106,11 @@ async def delete_document(
     await session.commit()
 
     doc_dir = settings.upload_dir / document_id
-    if doc_dir.exists():
-        shutil.rmtree(doc_dir)
+    try:
+        if doc_dir.exists():
+            shutil.rmtree(doc_dir)
+    except OSError:
+        logger.warning("Failed to remove file directory for document %s", document_id)
 
     logger.info("Deleted document %s (%s)", document_id, doc.filename)
     return True

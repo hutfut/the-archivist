@@ -65,9 +65,9 @@ async def upload_document(
             detail=f"File too large ({len(content)} bytes). Maximum is {max_mb:.0f} MB.",
         )
 
-    await file.seek(0)
-
-    result = await document_service.save_document(file, session, settings, processor)
+    result = await document_service.save_document(
+        file.filename or "unnamed", content, session, settings, processor,
+    )
     logger.info("Uploaded document %s (%s, %d bytes)", result.id, result.filename, result.file_size)
     return result
 
