@@ -25,5 +25,5 @@ Follow this order for every unit of work:
 
 - Do not modify `PROMPT.md` -- it contains the original assessment requirements.
 - Do not over-engineer. Build what is asked for, well.
-- When making a structural or architectural choice, add a new ADR in `.docs/adr/` (one document per decision) before proceeding.
+- When making a structural or architectural choice, add a new ADR in `.docs/adr/` (one document per decision) before proceeding. Update the `.docs/adr/README.md` with an entry in the table.
 - If something is ambiguous in the prompt, state your assumption explicitly and proceed.
