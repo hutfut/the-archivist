@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Upload Markdown documents to the backend document API.
+"""Upload documents to the backend document API.
 
 Generic seeder: accepts a zip archive and/or a list of paths (files or
-directories). All .md files from these sources are uploaded via
+directories). A zip may contain any mix of API-supported types (.md, .txt,
+.pdf); paths may be files or dirs of those types. All are uploaded via
 POST /api/documents.
 
 Usage:
-    python seed_documents.py --zip wiki_pages.zip
+    python seed_documents.py --zip docs.zip
     python seed_documents.py --paths wiki_pages/
-    python seed_documents.py --paths doc1.md doc2.md ./content/
+    python seed_documents.py --paths doc1.md doc2.txt report.pdf ./content/
     python seed_documents.py --zip wiki_pages.zip --paths extra/
     python seed_documents.py --zip wiki_pages.zip --dry-run
 """
@@ -27,41 +28,70 @@ logger = logging.getLogger("seed_documents")
 
 UPLOAD_TIMEOUT = 60.0
 
+# Must match backend app/config.py ALLOWED_EXTENSIONS and EXTENSION_TO_CONTENT_TYPE.
+ALLOWED_EXTENSIONS = frozenset({".pdf", ".txt", ".md"})
+EXTENSION_TO_CONTENT_TYPE = {
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+}
 
-def iter_md_from_zip(zip_path: Path) -> Iterator[tuple[str, str]]:
-    """Yield (filename, content) for each .md entry in the zip."""
+
+def _content_type_for(filename: str) -> str:
+    """Return MIME type for filename; application/octet-stream if not allowed."""
+    ext = Path(filename).suffix.lower()
+    return EXTENSION_TO_CONTENT_TYPE.get(ext, "application/octet-stream")
+
+
+def iter_docs_from_zip(zip_path: Path) -> Iterator[tuple[str, bytes, str]]:
+    """Yield (filename, content_bytes, content_type) for each API-supported file in the zip."""
     with zipfile.ZipFile(zip_path, "r") as zf:
         for name in zf.namelist():
-            if not name.endswith(".md"):
+            ext = Path(name).suffix.lower()
+            if ext not in ALLOWED_EXTENSIONS:
                 continue
             try:
-                content = zf.read(name).decode("utf-8")
-            except (KeyError, UnicodeDecodeError) as e:
+                content = zf.read(name)
+            except (KeyError, zipfile.BadZipFile) as e:
                 logger.warning("Skipping %s: %s", name, e)
                 continue
-            # Use basename so "wiki_pages/Title.md" -> "Title.md"
+            if not content:
+                logger.warning("Skipping empty entry: %s", name)
+                continue
             filename = Path(name).name
-            yield filename, content
+            yield filename, content, _content_type_for(filename)
 
 
-def iter_md_from_paths(paths: Iterable[Path]) -> Iterator[tuple[str, str]]:
-    """Yield (filename, content) for each .md file in the given paths (files or dirs)."""
+def iter_docs_from_paths(paths: Iterable[Path]) -> Iterator[tuple[str, bytes, str]]:
+    """Yield (filename, content_bytes, content_type) for each supported file in the given paths."""
     seen: set[Path] = set()
     for p in paths:
         p = p.resolve()
         if p.is_file():
-            if p.suffix.lower() == ".md" and p not in seen:
+            if p.suffix.lower() in ALLOWED_EXTENSIONS and p not in seen:
                 seen.add(p)
                 try:
-                    yield p.name, p.read_text(encoding="utf-8")
+                    content = p.read_bytes()
+                    if not content:
+                        logger.warning("Skipping empty file: %s", p)
+                        continue
+                    yield p.name, content, _content_type_for(p.name)
                 except OSError as e:
                     logger.warning("Skipping %s: %s", p, e)
         elif p.is_dir():
             for child in sorted(p.iterdir()):
-                if child.is_file() and child.suffix.lower() == ".md" and child not in seen:
+                if (
+                    child.is_file()
+                    and child.suffix.lower() in ALLOWED_EXTENSIONS
+                    and child not in seen
+                ):
                     seen.add(child)
                     try:
-                        yield child.name, child.read_text(encoding="utf-8")
+                        content = child.read_bytes()
+                        if not content:
+                            logger.warning("Skipping empty file: %s", child)
+                            continue
+                        yield child.name, content, _content_type_for(child.name)
                     except OSError as e:
                         logger.warning("Skipping %s: %s", child, e)
         else:
@@ -72,11 +102,12 @@ def upload_file(
     client: httpx.Client,
     api_url: str,
     filename: str,
-    content: str,
+    content: bytes,
+    content_type: str,
 ) -> bool:
-    """Upload a Markdown document to the backend. Returns True on success."""
+    """Upload a document to the backend. Returns True on success."""
     url = f"{api_url.rstrip('/')}/api/documents"
-    files = {"file": (filename, content.encode("utf-8"), "text/markdown")}
+    files = {"file": (filename, content, content_type)}
     try:
         resp = client.post(url, files=files)
     except httpx.RequestError as exc:
@@ -95,7 +126,7 @@ def upload_file(
 
 def run(args: argparse.Namespace) -> int:
     """Main entry point. Returns 0 on success, 1 if any upload failed."""
-    sources: list[Iterator[tuple[str, str]]] = []
+    sources: list[Iterator[tuple[str, bytes, str]]] = []
 
     if args.zip:
         zip_path = Path(args.zip)
@@ -103,14 +134,14 @@ def run(args: argparse.Namespace) -> int:
             logger.error("Zip file not found: %s", zip_path)
             return 1
         try:
-            sources.append(iter_md_from_zip(zip_path))
+            sources.append(iter_docs_from_zip(zip_path))
         except zipfile.BadZipFile as e:
             logger.error("Invalid zip %s: %s", zip_path, e)
             return 1
 
     if args.paths:
         path_list = [Path(p) for p in args.paths]
-        sources.append(iter_md_from_paths(path_list))
+        sources.append(iter_docs_from_paths(path_list))
 
     if not sources:
         logger.error("Provide at least one of --zip or --paths")
@@ -122,13 +153,13 @@ def run(args: argparse.Namespace) -> int:
 
     try:
         for source in sources:
-            for filename, content in source:
+            for filename, content, content_type in source:
                 if args.dry_run:
                     logger.info("Would upload: %s", filename)
                     succeeded += 1
                     continue
                 logger.info("Uploading: %s", filename)
-                if upload_file(client, args.api_url, filename, content):
+                if upload_file(client, args.api_url, filename, content, content_type):
                     succeeded += 1
                 else:
                     failed += 1
@@ -141,7 +172,7 @@ def run(args: argparse.Namespace) -> int:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Upload Markdown documents to the backend document API.",
+        description="Upload documents to the backend document API (.md, .txt, .pdf).",
     )
     parser.add_argument(
         "--api-url",
@@ -151,14 +182,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--zip",
         metavar="PATH",
-        help="Path to a zip archive containing .md files",
+        help="Path to a zip containing any supported types (.md, .txt, .pdf)",
     )
     parser.add_argument(
         "--paths",
         nargs="*",
         metavar="PATH",
         default=None,
-        help="Paths to .md files or directories containing .md files",
+        help="Paths to files or directories (supported: .md, .txt, .pdf)",
     )
     parser.add_argument(
         "--dry-run",
