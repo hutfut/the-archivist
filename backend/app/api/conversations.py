@@ -179,7 +179,14 @@ async def _stream_response(
     agent: CompiledStateGraph,
     max_history_messages: int,
 ) -> AsyncGenerator[str, None]:
-    """Async generator that yields SSE events for a chat message."""
+    """Async generator that yields SSE events for a chat message.
+
+    NOTE: This is *simulated* streaming -- the agent runs to completion, then
+    the response text is chunked into word-groups emitted as content_delta
+    events with small delays. Real token-level streaming requires a streaming-
+    capable LLM; with mock or Ollama, replace ``agent.ainvoke`` with
+    ``agent.astream_events`` and yield deltas as they arrive from the model.
+    """
     logger.info("Stream started for conversation %s (%d chars)", conversation_id, len(content))
     session_factory = get_session_factory()
 

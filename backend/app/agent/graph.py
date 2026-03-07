@@ -45,7 +45,7 @@ _REWRITE_PROMPT = (
 
 
 def _build_rewrite_node(llm: BaseChatModel, enabled: bool) -> Any:
-    def rewrite_query(state: AgentState) -> dict:
+    async def rewrite_query(state: AgentState) -> dict:
         original = state["query"]
 
         if not enabled:
@@ -55,7 +55,7 @@ def _build_rewrite_node(llm: BaseChatModel, enabled: bool) -> Any:
             SystemMessage(content=_REWRITE_PROMPT),
             HumanMessage(content=original),
         ]
-        result = llm.invoke(messages)
+        result = await llm.ainvoke(messages)
         raw_text = str(result.content).strip()
         alternatives = [line.strip() for line in raw_text.splitlines() if line.strip()]
 
@@ -139,7 +139,7 @@ def _build_grade_node(similarity_threshold: float) -> Any:
 
 
 def _build_generate_node(llm: BaseChatModel) -> Any:
-    def generate_response(state: AgentState) -> dict:
+    async def generate_response(state: AgentState) -> dict:
         chunks = state["relevant_chunks"]
 
         context_parts = []
@@ -167,7 +167,7 @@ def _build_generate_node(llm: BaseChatModel) -> Any:
         )
         messages.append(HumanMessage(content=prompt))
 
-        result = llm.invoke(messages)
+        result = await llm.ainvoke(messages)
         response_text = str(result.content)
 
         sources = [

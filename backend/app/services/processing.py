@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -196,7 +197,7 @@ class PipelineProcessor:
             filename = file_path.name
 
         try:
-            text = extract_text(file_path, content_type)
+            text = await asyncio.to_thread(extract_text, file_path, content_type)
         except (ValueError, OSError) as exc:
             logger.warning("Failed to extract text from document %s: %s", doc_id, exc)
             return 0
@@ -218,7 +219,7 @@ class PipelineProcessor:
             return 0
 
         texts = [c.content for c in chunks_with_headings]
-        embeddings = self._embedding_service.embed_texts(texts)
+        embeddings = await asyncio.to_thread(self._embedding_service.embed_texts, texts)
 
         now = datetime.now(timezone.utc)
         for i, (cwh, embedding) in enumerate(zip(chunks_with_headings, embeddings)):
