@@ -6,6 +6,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine
 from testcontainers.postgres import PostgresContainer
 
+from sqlalchemy import text
+
 from app.agent.graph import build_agent_graph
 from app.agent.llm import MockChatModel
 from app.api.conversations import get_agent, init_agent
@@ -46,9 +48,22 @@ async def test_settings(tmp_path: Path, database_url: str) -> Settings:
     )
 
 
+async def _create_schema(database_url: str) -> None:
+    """Create pgvector extension and all tables for tests.
+
+    Production relies on Alembic migrations; tests use create_all for speed.
+    """
+    engine = create_async_engine(database_url)
+    async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        await conn.run_sync(Base.metadata.create_all)
+    await engine.dispose()
+
+
 @pytest.fixture
 async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
     await init_db(test_settings.database_url)
+    await _create_schema(test_settings.database_url)
 
     mock_embeddings = MockEmbeddingService()
     init_processor(mock_embeddings)

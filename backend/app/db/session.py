@@ -1,6 +1,7 @@
+import logging
+import re
 from collections.abc import AsyncGenerator
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -8,20 +9,29 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.db.models import Base
+logger = logging.getLogger(__name__)
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
+_PASSWORD_RE = re.compile(r"://[^:]+:([^@]+)@")
+
+
+def _mask_url(url: str) -> str:
+    """Replace password in a database URL with '***'."""
+    return _PASSWORD_RE.sub(lambda m: m.group(0).replace(m.group(1), "***"), url)
+
 
 async def init_db(database_url: str) -> None:
-    """Create the async engine, enable pgvector, and run schema creation."""
+    """Create the async engine and session factory.
+
+    Schema creation is handled by Alembic migrations (``alembic upgrade head``).
+    Tests may call ``Base.metadata.create_all`` directly for speed.
+    """
     global _engine, _session_factory
     _engine = create_async_engine(database_url)
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
-    async with _engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database engine initialized: %s", _mask_url(database_url))
 
 
 async def close_db() -> None:
@@ -29,6 +39,7 @@ async def close_db() -> None:
     global _engine, _session_factory
     if _engine is not None:
         await _engine.dispose()
+        logger.info("Database engine disposed")
     _engine = None
     _session_factory = None
 

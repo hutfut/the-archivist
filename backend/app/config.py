@@ -5,6 +5,12 @@ from pathlib import Path
 
 ALLOWED_EXTENSIONS: frozenset[str] = frozenset({".pdf", ".txt", ".md"})
 
+EXTENSION_TO_CONTENT_TYPE: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+}
+
 
 @dataclass(frozen=True)
 class Settings:

@@ -2,17 +2,24 @@ import logging
 import shutil
 import uuid
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 
 from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import Settings
+from app.config import EXTENSION_TO_CONTENT_TYPE, Settings
 from app.db.models import Document
 from app.models.document import DocumentResponse
 from app.services.processing import DocumentProcessor
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_content_type(filename: str) -> str:
+    """Derive MIME type from file extension rather than trusting client headers."""
+    ext = PurePosixPath(filename).suffix.lower()
+    return EXTENSION_TO_CONTENT_TYPE.get(ext, "application/octet-stream")
 
 
 async def save_document(
@@ -24,7 +31,7 @@ async def save_document(
     """Persist an uploaded file to disk, process it, and record metadata."""
     doc_id = str(uuid.uuid4())
     filename = file.filename or "unnamed"
-    content_type = file.content_type or "application/octet-stream"
+    content_type = _resolve_content_type(filename)
 
     doc_dir = settings.upload_dir / doc_id
     doc_dir.mkdir(parents=True, exist_ok=True)

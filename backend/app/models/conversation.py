@@ -8,6 +8,7 @@ class SourceAttribution(BaseModel):
     filename: str
     chunk_content: str
     similarity_score: float
+    section_heading: str | None = None
 
 
 class MessageResponse(BaseModel):
