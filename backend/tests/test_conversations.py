@@ -317,3 +317,16 @@ async def test_conversation_history_truncated(client: AsyncClient) -> None:
     assert len(history) == 4
     assert history[0]["content"] == "msg-2"
     assert history[-1]["content"] == "msg-5"
+
+
+async def test_list_conversations_pagination(client: AsyncClient) -> None:
+    for _ in range(3):
+        await _create_conversation(client)
+
+    resp = await client.get("/api/conversations", params={"limit": 2})
+    assert resp.status_code == 200
+    assert len(resp.json()["conversations"]) == 2
+
+    resp = await client.get("/api/conversations", params={"limit": 2, "offset": 2})
+    assert resp.status_code == 200
+    assert len(resp.json()["conversations"]) == 1

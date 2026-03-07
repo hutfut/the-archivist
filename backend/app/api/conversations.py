@@ -6,7 +6,7 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,9 +59,13 @@ async def create_conversation(
 
 @router.get("/conversations", response_model=ConversationListResponse)
 async def list_conversations(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationListResponse:
-    conversations = await conversation_service.list_conversations(session)
+    conversations = await conversation_service.list_conversations(
+        session, limit=limit, offset=offset,
+    )
     return ConversationListResponse(conversations=conversations)
 
 

@@ -39,10 +39,16 @@ async def create_conversation(session: AsyncSession) -> ConversationResponse:
 
 async def list_conversations(
     session: AsyncSession,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[ConversationResponse]:
-    result = await session.execute(
-        select(Conversation).order_by(Conversation.updated_at.desc())
+    stmt = (
+        select(Conversation)
+        .order_by(Conversation.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
+    result = await session.execute(stmt)
     rows = result.scalars().all()
     return [ConversationResponse.model_validate(row) for row in rows]
 

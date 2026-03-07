@@ -1,7 +1,7 @@
 import logging
 from pathlib import PurePosixPath
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -74,9 +74,11 @@ async def upload_document(
 
 @router.get("/documents", response_model=DocumentListResponse)
 async def list_documents(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentListResponse:
-    docs = await document_service.list_documents(session)
+    docs = await document_service.list_documents(session, limit=limit, offset=offset)
     return DocumentListResponse(documents=docs)
 
 

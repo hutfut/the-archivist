@@ -204,3 +204,19 @@ async def test_upload_md_with_wrong_mime_still_processed_as_markdown(
     assert response.status_code == 201
     body = response.json()
     assert body["content_type"] == "text/markdown"
+
+
+async def test_list_documents_pagination(client: AsyncClient) -> None:
+    for i in range(3):
+        await client.post(
+            "/api/documents",
+            files={"file": (f"page{i}.txt", f"content {i}".encode(), "text/plain")},
+        )
+
+    resp = await client.get("/api/documents", params={"limit": 2})
+    assert resp.status_code == 200
+    assert len(resp.json()["documents"]) == 2
+
+    resp = await client.get("/api/documents", params={"limit": 2, "offset": 2})
+    assert resp.status_code == 200
+    assert len(resp.json()["documents"]) == 1

@@ -67,11 +67,19 @@ async def save_document(
     return DocumentResponse.model_validate(doc)
 
 
-async def list_documents(session: AsyncSession) -> list[DocumentResponse]:
-    """Return all documents ordered by creation time (newest first)."""
-    result = await session.execute(
-        select(Document).order_by(Document.created_at.desc())
+async def list_documents(
+    session: AsyncSession,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[DocumentResponse]:
+    """Return documents ordered by creation time (newest first)."""
+    stmt = (
+        select(Document)
+        .order_by(Document.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
+    result = await session.execute(stmt)
     rows = result.scalars().all()
     return [DocumentResponse.model_validate(row) for row in rows]
 

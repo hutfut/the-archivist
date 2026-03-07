@@ -66,6 +66,9 @@ class Settings:
             os.environ.get("MAX_HISTORY_MESSAGES", "50")
         )
     )
+    log_level: str = field(
+        default_factory=lambda: os.environ.get("LOG_LEVEL", "INFO")
+    )
 
 
 @lru_cache(maxsize=1)
