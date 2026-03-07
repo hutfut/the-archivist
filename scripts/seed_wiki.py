@@ -18,15 +18,12 @@ import logging
 import re
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import httpx
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 logger = logging.getLogger("seed_wiki")
 
@@ -93,6 +90,17 @@ def fetch_page_html(client: httpx.Client, title: str) -> str | None:
     return data["parse"]["text"]["*"]
 
 
+_SKIP_TITLE_PREFIXES = ["Version"]
+
+_STRIP_SECTION_HEADINGS = [
+    "version history",
+    "references",
+    "see also",
+    "dialogues",
+    "gallery",
+    "gameplay video",
+]
+
 _REMOVE_SELECTORS = [
     ".mw-editsection",
     "#toc",
@@ -128,6 +136,43 @@ def clean_html(html: str) -> str:
     return str(soup)
 
 
+def should_skip_title(title: str) -> bool:
+    """Return True if a wiki page title should be excluded from seeding."""
+    return any(title.startswith(prefix) for prefix in _SKIP_TITLE_PREFIXES)
+
+
+def strip_sections(md: str, headings: Sequence[str]) -> str:
+    """Remove ``##``-level sections whose heading matches any entry in *headings*.
+
+    Matching is case-insensitive. A matched section includes all content
+    from the ``## heading`` line up to (but not including) the next ``## ``
+    heading or the end of the document. Child headings (``###``, ``####``)
+    within the matched section are removed together with their parent.
+
+    Args:
+        md: Markdown text to filter.
+        headings: Lowercase heading names to strip (e.g. ``["version history"]``).
+
+    Returns:
+        Filtered markdown with matched sections removed.
+    """
+    if not md or not headings:
+        return md
+
+    headings_lower = set(headings)
+    fragments = re.split(r"^(?=## )", md, flags=re.MULTILINE)
+
+    kept: list[str] = []
+    for fragment in fragments:
+        first_line = fragment.split("\n", 1)[0]
+        heading_match = re.match(r"^## (.+)$", first_line)
+        if heading_match and heading_match.group(1).strip().lower() in headings_lower:
+            continue
+        kept.append(fragment)
+
+    return "".join(kept).strip()
+
+
 def html_to_markdown(html: str, title: str) -> str:
     """Convert cleaned HTML to Markdown with a title header."""
     cleaned = clean_html(html)
@@ -136,6 +181,7 @@ def html_to_markdown(html: str, title: str) -> str:
     md = re.sub(r"\n{3,}", "\n\n", md)
     md = re.sub(r"[ \t]+$", "", md, flags=re.MULTILINE)
     md = md.strip()
+    md = strip_sections(md, _STRIP_SECTION_HEADINGS)
 
     return f"# {title}\n\n{md}\n"
 
@@ -199,6 +245,11 @@ def run(args: argparse.Namespace) -> int:
         skipped = 0
 
         for i, title in enumerate(titles, 1):
+            if should_skip_title(title):
+                logger.info("[%d/%d] %s — skipped (title excluded)", i, len(titles), title)
+                skipped += 1
+                continue
+
             filename = sanitize_filename(title)
             log_prefix = f"[{i}/{len(titles)}] {title}"
 
