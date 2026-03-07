@@ -332,10 +332,12 @@ async def test_list_conversations_pagination(client: AsyncClient) -> None:
     resp = await client.get("/api/conversations", params={"limit": 2})
     assert resp.status_code == 200
     assert len(resp.json()["conversations"]) == 2
+    assert resp.json()["total"] == 3
 
     resp = await client.get("/api/conversations", params={"limit": 2, "offset": 2})
     assert resp.status_code == 200
     assert len(resp.json()["conversations"]) == 1
+    assert resp.json()["total"] == 3
 
 
 async def test_send_message_invalid_uuid_returns_422(

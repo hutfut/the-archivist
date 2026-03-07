@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -9,7 +9,14 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.agent.llm import _CONTEXT_MARKER
-from app.services.retrieval import RetrievedChunk, RetrievalService
+from app.services.retrieval import (
+    RetrievedChunk,
+    RetrievalService,
+    deduplicate_chunks,
+)
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +81,7 @@ def _build_retrieve_node(
     retrieval_service: RetrievalService,
     top_k: int,
     candidate_k: int,
-    session_factory: Any,
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> Any:
     async def retrieve_documents(state: AgentState) -> dict:
         queries = state.get("search_queries") or [state["query"]]
@@ -91,7 +98,6 @@ def _build_retrieve_node(
                 all_chunks.extend(chunks)
 
         if len(queries) > 1:
-            from app.services.retrieval import deduplicate_chunks
             all_chunks = deduplicate_chunks(all_chunks, final_k=top_k)
 
         logger.info(
@@ -195,7 +201,7 @@ def _has_relevant_chunks(state: AgentState) -> str:
 def build_agent_graph(
     retrieval_service: RetrievalService,
     llm: BaseChatModel,
-    session_factory: Any,
+    session_factory: async_sessionmaker[AsyncSession],
     similarity_threshold: float = 0.3,
     top_k: int = 5,
     candidate_k: int = 10,

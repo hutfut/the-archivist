@@ -1,3 +1,4 @@
+import shutil
 import uuid
 from pathlib import Path
 
@@ -216,7 +217,29 @@ async def test_list_documents_pagination(client: AsyncClient) -> None:
     resp = await client.get("/api/documents", params={"limit": 2})
     assert resp.status_code == 200
     assert len(resp.json()["documents"]) == 2
+    assert resp.json()["total"] == 3
 
     resp = await client.get("/api/documents", params={"limit": 2, "offset": 2})
     assert resp.status_code == 200
     assert len(resp.json()["documents"]) == 1
+    assert resp.json()["total"] == 3
+
+
+async def test_delete_document_files_already_removed(
+    client: AsyncClient, test_settings: "Settings"  # noqa: F821
+) -> None:
+    """Deleting a document whose files are already gone should still return 204."""
+    upload = await client.post(
+        "/api/documents",
+        files={"file": ("ghost.txt", b"hello world", "text/plain")},
+    )
+    assert upload.status_code == 201
+    doc_id = upload.json()["id"]
+
+    doc_dir = test_settings.upload_dir / doc_id
+    assert doc_dir.exists()
+    shutil.rmtree(doc_dir)
+    assert not doc_dir.exists()
+
+    resp = await client.delete(f"/api/documents/{doc_id}")
+    assert resp.status_code == 204
