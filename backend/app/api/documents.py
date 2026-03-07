@@ -1,5 +1,6 @@
 import logging
 from pathlib import PurePosixPath
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,11 +88,11 @@ async def list_documents(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_document(
-    document_id: str,
+    document_id: UUID,
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    deleted = await document_service.delete_document(document_id, session, settings)
+    deleted = await document_service.delete_document(str(document_id), session, settings)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -5,10 +5,13 @@ routing -> service -> agent -> database.
 """
 
 import json
+import uuid
 from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
+
+NONEXISTENT_UUID = str(uuid.uuid4())
 
 
 async def _create_conversation(client: AsyncClient) -> dict:
@@ -68,7 +71,7 @@ async def test_get_conversation_with_messages(client: AsyncClient) -> None:
 
 
 async def test_get_conversation_not_found(client: AsyncClient) -> None:
-    resp = await client.get("/api/conversations/nonexistent-id")
+    resp = await client.get(f"/api/conversations/{NONEXISTENT_UUID}")
     assert resp.status_code == 404
 
 
@@ -83,7 +86,7 @@ async def test_delete_conversation(client: AsyncClient) -> None:
 
 
 async def test_delete_conversation_not_found(client: AsyncClient) -> None:
-    resp = await client.delete("/api/conversations/nonexistent-id")
+    resp = await client.delete(f"/api/conversations/{NONEXISTENT_UUID}")
     assert resp.status_code == 404
 
 
@@ -138,7 +141,7 @@ async def test_send_message_nonexistent_conversation(
     client: AsyncClient,
 ) -> None:
     resp = await client.post(
-        "/api/conversations/nonexistent-id/messages",
+        f"/api/conversations/{NONEXISTENT_UUID}/messages",
         json={"content": "Hello"},
     )
     assert resp.status_code == 404
@@ -286,7 +289,7 @@ async def test_stream_message_nonexistent_conversation(
 ) -> None:
     """Streaming to a nonexistent conversation should emit an error event."""
     resp = await client.post(
-        "/api/conversations/nonexistent-id/messages/stream",
+        f"/api/conversations/{NONEXISTENT_UUID}/messages/stream",
         json={"content": "Hello"},
     )
     assert resp.status_code == 200
@@ -330,3 +333,20 @@ async def test_list_conversations_pagination(client: AsyncClient) -> None:
     resp = await client.get("/api/conversations", params={"limit": 2, "offset": 2})
     assert resp.status_code == 200
     assert len(resp.json()["conversations"]) == 1
+
+
+async def test_send_message_invalid_uuid_returns_422(
+    client: AsyncClient,
+) -> None:
+    resp = await client.post(
+        "/api/conversations/not-a-uuid/messages",
+        json={"content": "Hello"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_delete_document_invalid_uuid_returns_422(
+    client: AsyncClient,
+) -> None:
+    resp = await client.delete("/api/documents/not-a-uuid")
+    assert resp.status_code == 422

@@ -30,6 +30,18 @@ class MockChatModel(BaseChatModel):
     def _llm_type(self) -> str:
         return "mock-chat-model"
 
+    def _format_response(self, messages: list[BaseMessage]) -> str:
+        last_message = messages[-1].content if messages else ""
+        content = str(last_message)
+
+        if _CONTEXT_MARKER in content:
+            context_section = content.split(_CONTEXT_MARKER, 1)[1].strip()
+            return (
+                f"Based on your documents, here is what I found:\n\n"
+                f"{context_section}"
+            )
+        return _NO_CONTEXT_RESPONSE
+
     def _generate(
         self,
         messages: list[BaseMessage],
@@ -37,20 +49,18 @@ class MockChatModel(BaseChatModel):
         run_manager: Any = None,
         **kwargs: Any,
     ) -> ChatResult:
-        last_message = messages[-1].content if messages else ""
-        content = str(last_message)
+        response_text = self._format_response(messages)
+        generation = ChatGeneration(message=AIMessage(content=response_text))
+        return ChatResult(generations=[generation])
 
-        if _CONTEXT_MARKER in content:
-            context_section = content.split(_CONTEXT_MARKER, 1)[1].strip()
-            response_text = (
-                f"Based on your documents, here is what I found:\n\n"
-                f"{context_section}"
-            )
-        elif content.strip():
-            response_text = _NO_CONTEXT_RESPONSE
-        else:
-            response_text = _NO_CONTEXT_RESPONSE
-
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        response_text = self._format_response(messages)
         generation = ChatGeneration(message=AIMessage(content=response_text))
         return ChatResult(generations=[generation])
 

@@ -15,11 +15,16 @@ from app.models.conversation import (
 )
 
 if TYPE_CHECKING:
+    from langgraph.graph.state import CompiledStateGraph
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 MAX_TITLE_LENGTH = 100
+
+
+class AgentError(Exception):
+    """Raised when the AI agent fails during a conversation turn."""
 
 
 async def create_conversation(session: AsyncSession) -> ConversationResponse:
@@ -166,3 +171,55 @@ async def get_conversation_history(
     result = await session.execute(stmt)
     messages = list(reversed(result.scalars().all()))
     return [{"role": m.role, "content": m.content} for m in messages]
+
+
+async def run_agent_turn(
+    conversation_id: str,
+    content: str,
+    agent: CompiledStateGraph,
+    session: AsyncSession,
+    max_history_messages: int | None = None,
+) -> MessageResponse:
+    """Execute a full chat turn: save user message, invoke agent, save response.
+
+    All DB writes are committed atomically. On agent failure the session is
+    rolled back and AgentError is raised so callers can translate to HTTP 502
+    or an SSE error event.
+    """
+    await add_message(
+        conversation_id=conversation_id,
+        role="user",
+        content=content,
+        session=session,
+        commit=False,
+    )
+
+    history = await get_conversation_history(
+        conversation_id, session, max_messages=max_history_messages,
+    )
+
+    try:
+        agent_result = await agent.ainvoke({
+            "query": content,
+            "conversation_history": history,
+        })
+    except Exception:
+        logger.exception("Agent failed for conversation %s", conversation_id)
+        await session.rollback()
+        raise AgentError("The AI agent failed to generate a response.")
+
+    assistant_message = await add_message(
+        conversation_id=conversation_id,
+        role="assistant",
+        content=agent_result["response"],
+        session=session,
+        sources=agent_result.get("sources"),
+        commit=False,
+    )
+
+    await set_conversation_title(
+        conversation_id, content, session, commit=False,
+    )
+
+    await session.commit()
+    return assistant_message

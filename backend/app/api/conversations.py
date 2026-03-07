@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -20,6 +21,7 @@ from app.models.conversation import (
     SendMessageRequest,
 )
 from app.services import conversation_service
+from app.services.conversation_service import AgentError
 
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
@@ -74,11 +76,11 @@ async def list_conversations(
     response_model=ConversationDetailResponse,
 )
 async def get_conversation(
-    conversation_id: str,
+    conversation_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetailResponse:
     detail = await conversation_service.get_conversation_with_messages(
-        conversation_id, session
+        str(conversation_id), session
     )
     if detail is None:
         raise HTTPException(
@@ -93,11 +95,11 @@ async def get_conversation(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_conversation(
-    conversation_id: str,
+    conversation_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> None:
     deleted = await conversation_service.delete_conversation(
-        conversation_id, session
+        str(conversation_id), session
     )
     if not deleted:
         raise HTTPException(
@@ -113,14 +115,14 @@ async def delete_conversation(
     status_code=status.HTTP_201_CREATED,
 )
 async def send_message(
-    conversation_id: str,
+    conversation_id: UUID,
     request: SendMessageRequest,
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> MessageResponse:
     conversation = await conversation_service.get_conversation(
-        conversation_id, session
+        str(conversation_id), session
     )
     if conversation is None:
         raise HTTPException(
@@ -128,48 +130,22 @@ async def send_message(
             detail="Conversation not found",
         )
 
-    logger.info("Message received for conversation %s (%d chars)", conversation_id, len(request.content))
-
-    await conversation_service.add_message(
-        conversation_id=conversation_id,
-        role="user",
-        content=request.content,
-        session=session,
-        commit=False,
-    )
-
-    history = await conversation_service.get_conversation_history(
-        conversation_id, session, max_messages=settings.max_history_messages,
-    )
+    cid = str(conversation_id)
+    logger.info("Message received for conversation %s (%d chars)", cid, len(request.content))
 
     try:
-        agent_result = await agent.ainvoke({
-            "query": request.content,
-            "conversation_history": history,
-        })
-    except Exception:
-        logger.exception("Agent failed for conversation %s", conversation_id)
-        await session.rollback()
+        return await conversation_service.run_agent_turn(
+            conversation_id=cid,
+            content=request.content,
+            agent=agent,
+            session=session,
+            max_history_messages=settings.max_history_messages,
+        )
+    except AgentError:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The AI agent failed to generate a response. Please try again.",
         )
-
-    assistant_message = await conversation_service.add_message(
-        conversation_id=conversation_id,
-        role="assistant",
-        content=agent_result["response"],
-        session=session,
-        sources=agent_result.get("sources"),
-        commit=False,
-    )
-
-    await conversation_service.set_conversation_title(
-        conversation_id, request.content, session, commit=False,
-    )
-
-    await session.commit()
-    return assistant_message
 
 
 def _sse_event(event: str, data: dict[str, Any]) -> str:
@@ -196,6 +172,11 @@ async def _stream_response(
 ) -> AsyncGenerator[str, None]:
     """Async generator that yields SSE events for a chat message.
 
+    Creates its own DB session from the factory rather than using FastAPI DI
+    because async generators outlive the request scope -- FastAPI closes its
+    dependency-injected session when the endpoint returns, but the SSE body
+    is still being streamed to the client.
+
     NOTE: This is *simulated* streaming -- the agent runs to completion, then
     the response text is chunked into word-groups emitted as content_delta
     events with small delays. Real token-level streaming requires a streaming-
@@ -214,56 +195,28 @@ async def _stream_response(
             yield _sse_event("error", {"detail": "Conversation not found"})
             return
 
-        await conversation_service.add_message(
-            conversation_id=conversation_id,
-            role="user",
-            content=content,
-            session=session,
-            commit=False,
-        )
-
-        history = await conversation_service.get_conversation_history(
-            conversation_id, session, max_messages=max_history_messages,
-        )
-
         try:
-            agent_result = await agent.ainvoke({
-                "query": content,
-                "conversation_history": history,
-            })
-        except Exception:
-            logger.exception("Agent failed during stream for conversation %s", conversation_id)
-            await session.rollback()
+            assistant_message = await conversation_service.run_agent_turn(
+                conversation_id=conversation_id,
+                content=content,
+                agent=agent,
+                session=session,
+                max_history_messages=max_history_messages,
+            )
+        except AgentError:
             yield _sse_event("error", {"detail": "The AI agent failed to generate a response."})
             return
-
-        response_text: str = agent_result["response"]
-        sources: list[dict[str, Any]] = agent_result.get("sources", [])
-
-        assistant_message = await conversation_service.add_message(
-            conversation_id=conversation_id,
-            role="assistant",
-            content=response_text,
-            session=session,
-            sources=sources,
-            commit=False,
-        )
-
-        await conversation_service.set_conversation_title(
-            conversation_id, content, session, commit=False,
-        )
-
-        await session.commit()
 
     yield _sse_event("message_start", {
         "message_id": assistant_message.id,
         "conversation_id": assistant_message.conversation_id,
     })
 
-    for chunk in _chunk_text(response_text):
+    for chunk in _chunk_text(assistant_message.content):
         yield _sse_event("content_delta", {"delta": chunk})
         await asyncio.sleep(0.02)
 
+    sources = [s.model_dump() for s in assistant_message.sources] if assistant_message.sources else []
     yield _sse_event("sources", {"sources": sources})
     yield _sse_event("message_end", {"message_id": assistant_message.id})
     logger.info("Stream completed for conversation %s (message %s)", conversation_id, assistant_message.id)
@@ -271,13 +224,13 @@ async def _stream_response(
 
 @router.post("/conversations/{conversation_id}/messages/stream")
 async def send_message_stream(
-    conversation_id: str,
+    conversation_id: UUID,
     request: SendMessageRequest,
     settings: Settings = Depends(get_settings),
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> StreamingResponse:
     return StreamingResponse(
-        _stream_response(conversation_id, request.content, agent, settings.max_history_messages),
+        _stream_response(str(conversation_id), request.content, agent, settings.max_history_messages),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
