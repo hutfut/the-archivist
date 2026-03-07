@@ -1,8 +1,9 @@
+import uuid as _uuid
 from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSON, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -14,7 +15,9 @@ class Base(DeclarativeBase):
 class Document(Base):
     __tablename__ = "documents"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
+    id: Mapped[_uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, default=_uuid.uuid4
+    )
     filename: Mapped[str] = mapped_column(String, nullable=False)
     content_type: Mapped[str] = mapped_column(String, nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -31,9 +34,11 @@ class Chunk(Base):
         Index("ix_chunks_search_vector", "search_vector", postgresql_using="gin"),
     )
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    document_id: Mapped[str] = mapped_column(
-        String, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    id: Mapped[_uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, default=_uuid.uuid4
+    )
+    document_id: Mapped[_uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -48,7 +53,9 @@ class Chunk(Base):
 class Conversation(Base):
     __tablename__ = "conversations"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
+    id: Mapped[_uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, default=_uuid.uuid4
+    )
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -64,9 +71,11 @@ class Message(Base):
         Index("ix_messages_conversation_id", "conversation_id"),
     )
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    conversation_id: Mapped[str] = mapped_column(
-        String,
+    id: Mapped[_uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, default=_uuid.uuid4
+    )
+    conversation_id: Mapped[_uuid.UUID] = mapped_column(
+        Uuid,
         ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=False,
     )

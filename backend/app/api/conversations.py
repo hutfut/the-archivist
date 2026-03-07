@@ -80,7 +80,7 @@ async def get_conversation(
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetailResponse:
     detail = await conversation_service.get_conversation_with_messages(
-        str(conversation_id), session
+        conversation_id, session
     )
     if detail is None:
         raise HTTPException(
@@ -99,7 +99,7 @@ async def delete_conversation(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     deleted = await conversation_service.delete_conversation(
-        str(conversation_id), session
+        conversation_id, session
     )
     if not deleted:
         raise HTTPException(
@@ -122,7 +122,7 @@ async def send_message(
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> MessageResponse:
     conversation = await conversation_service.get_conversation(
-        str(conversation_id), session
+        conversation_id, session
     )
     if conversation is None:
         raise HTTPException(
@@ -130,12 +130,11 @@ async def send_message(
             detail="Conversation not found",
         )
 
-    cid = str(conversation_id)
-    logger.info("Message received for conversation %s (%d chars)", cid, len(request.content))
+    logger.info("Message received for conversation %s (%d chars)", conversation_id, len(request.content))
 
     try:
         return await conversation_service.run_agent_turn(
-            conversation_id=cid,
+            conversation_id=conversation_id,
             content=request.content,
             agent=agent,
             session=session,
@@ -165,7 +164,7 @@ def _chunk_text(text: str, chunk_size: int = STREAM_CHUNK_SIZE) -> list[str]:
 
 
 async def _stream_response(
-    conversation_id: str,
+    conversation_id: UUID,
     content: str,
     agent: CompiledStateGraph,
     max_history_messages: int,
@@ -207,18 +206,20 @@ async def _stream_response(
             yield _sse_event("error", {"detail": "The AI agent failed to generate a response."})
             return
 
+    msg_id = str(assistant_message.id)
+
     yield _sse_event("message_start", {
-        "message_id": assistant_message.id,
-        "conversation_id": assistant_message.conversation_id,
+        "message_id": msg_id,
+        "conversation_id": str(assistant_message.conversation_id),
     })
 
     for chunk in _chunk_text(assistant_message.content):
         yield _sse_event("content_delta", {"delta": chunk})
         await asyncio.sleep(0.02)
 
-    sources = [s.model_dump() for s in assistant_message.sources] if assistant_message.sources else []
+    sources = [s.model_dump(mode="json") for s in assistant_message.sources] if assistant_message.sources else []
     yield _sse_event("sources", {"sources": sources})
-    yield _sse_event("message_end", {"message_id": assistant_message.id})
+    yield _sse_event("message_end", {"message_id": msg_id})
     logger.info("Stream completed for conversation %s (message %s)", conversation_id, assistant_message.id)
 
 
@@ -230,7 +231,7 @@ async def send_message_stream(
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> StreamingResponse:
     return StreamingResponse(
-        _stream_response(str(conversation_id), request.content, agent, settings.max_history_messages),
+        _stream_response(conversation_id, request.content, agent, settings.max_history_messages),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

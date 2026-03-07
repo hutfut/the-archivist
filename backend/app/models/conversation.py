@@ -1,10 +1,11 @@
+import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SourceAttribution(BaseModel):
-    document_id: str
+    document_id: uuid.UUID
     filename: str
     chunk_content: str
     similarity_score: float
@@ -12,23 +13,23 @@ class SourceAttribution(BaseModel):
 
 
 class MessageResponse(BaseModel):
-    id: str
-    conversation_id: str
+    id: uuid.UUID
+    conversation_id: uuid.UUID
     role: str
     content: str
     sources: list[SourceAttribution] | None = None
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationResponse(BaseModel):
-    id: str
+    id: uuid.UUID
     title: str | None = None
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationListResponse(BaseModel):

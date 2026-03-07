@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass, replace
 from functools import reduce
 from itertools import groupby
@@ -24,7 +25,7 @@ _OVERLAP_THRESHOLD = 0.60
 
 @dataclass(frozen=True)
 class RetrievedChunk:
-    document_id: str
+    document_id: uuid.UUID
     filename: str
     chunk_content: str
     chunk_index: int

@@ -172,7 +172,7 @@ def _build_generate_node(llm: BaseChatModel) -> Any:
 
         sources = [
             {
-                "document_id": chunk.document_id,
+                "document_id": str(chunk.document_id),
                 "filename": chunk.filename,
                 "chunk_content": chunk.chunk_content,
                 "similarity_score": chunk.similarity_score,

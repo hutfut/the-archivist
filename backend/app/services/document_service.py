@@ -29,10 +29,10 @@ async def save_document(
     processor: DocumentProcessor,
 ) -> DocumentResponse:
     """Persist uploaded file bytes to disk, process them, and record metadata."""
-    doc_id = str(uuid.uuid4())
+    doc_id = uuid.uuid4()
     content_type = _resolve_content_type(filename)
 
-    doc_dir = settings.upload_dir / doc_id
+    doc_dir = settings.upload_dir / str(doc_id)
     doc_dir.mkdir(parents=True, exist_ok=True)
     file_path = doc_dir / filename
 
@@ -87,7 +87,7 @@ async def list_documents(
 
 
 async def get_document(
-    document_id: str, session: AsyncSession
+    document_id: uuid.UUID, session: AsyncSession
 ) -> Document | None:
     """Fetch a single document by ID, or None if not found."""
     result = await session.execute(
@@ -97,7 +97,7 @@ async def get_document(
 
 
 async def delete_document(
-    document_id: str,
+    document_id: uuid.UUID,
     session: AsyncSession,
     settings: Settings,
 ) -> bool:
@@ -109,7 +109,7 @@ async def delete_document(
     await session.delete(doc)
     await session.commit()
 
-    doc_dir = settings.upload_dir / document_id
+    doc_dir = settings.upload_dir / str(document_id)
     try:
         if doc_dir.exists():
             shutil.rmtree(doc_dir)

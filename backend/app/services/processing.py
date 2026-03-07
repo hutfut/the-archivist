@@ -136,7 +136,7 @@ def chunk_markdown(
 class DocumentProcessor(Protocol):
     async def process(
         self,
-        doc_id: str,
+        doc_id: uuid.UUID,
         file_path: Path,
         content_type: str,
         session: AsyncSession,
@@ -185,7 +185,7 @@ class PipelineProcessor:
 
     async def process(
         self,
-        doc_id: str,
+        doc_id: uuid.UUID,
         file_path: Path,
         content_type: str,
         session: AsyncSession,
@@ -224,7 +224,7 @@ class PipelineProcessor:
         now = datetime.now(timezone.utc)
         for i, (cwh, embedding) in enumerate(zip(chunks_with_headings, embeddings)):
             chunk = Chunk(
-                id=str(uuid.uuid4()),
+                id=uuid.uuid4(),
                 document_id=doc_id,
                 chunk_index=i,
                 content=cwh.content,

@@ -30,7 +30,7 @@ class AgentError(Exception):
 async def create_conversation(session: AsyncSession) -> ConversationResponse:
     now = datetime.now(timezone.utc)
     conversation = Conversation(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         title=None,
         created_at=now,
         updated_at=now,
@@ -63,7 +63,7 @@ async def list_conversations(
 
 
 async def get_conversation(
-    conversation_id: str, session: AsyncSession
+    conversation_id: uuid.UUID, session: AsyncSession
 ) -> Conversation | None:
     result = await session.execute(
         select(Conversation).where(Conversation.id == conversation_id)
@@ -72,7 +72,7 @@ async def get_conversation(
 
 
 async def get_conversation_with_messages(
-    conversation_id: str, session: AsyncSession
+    conversation_id: uuid.UUID, session: AsyncSession
 ) -> ConversationDetailResponse | None:
     conversation = await get_conversation(conversation_id, session)
     if conversation is None:
@@ -95,7 +95,7 @@ async def get_conversation_with_messages(
 
 
 async def delete_conversation(
-    conversation_id: str, session: AsyncSession
+    conversation_id: uuid.UUID, session: AsyncSession
 ) -> bool:
     conversation = await get_conversation(conversation_id, session)
     if conversation is None:
@@ -108,7 +108,7 @@ async def delete_conversation(
 
 
 async def add_message(
-    conversation_id: str,
+    conversation_id: uuid.UUID,
     role: str,
     content: str,
     session: AsyncSession,
@@ -117,7 +117,7 @@ async def add_message(
 ) -> MessageResponse:
     now = datetime.now(timezone.utc)
     message = Message(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         conversation_id=conversation_id,
         role=role,
         content=content,
@@ -140,7 +140,7 @@ async def add_message(
 
 
 async def set_conversation_title(
-    conversation_id: str, title: str, session: AsyncSession,
+    conversation_id: uuid.UUID, title: str, session: AsyncSession,
     commit: bool = True,
 ) -> None:
     conversation = await get_conversation(conversation_id, session)
@@ -151,7 +151,7 @@ async def set_conversation_title(
 
 
 async def get_conversation_history(
-    conversation_id: str,
+    conversation_id: uuid.UUID,
     session: AsyncSession,
     max_messages: int | None = None,
 ) -> list[dict[str, str]]:
@@ -174,7 +174,7 @@ async def get_conversation_history(
 
 
 async def run_agent_turn(
-    conversation_id: str,
+    conversation_id: uuid.UUID,
     content: str,
     agent: CompiledStateGraph,
     session: AsyncSession,

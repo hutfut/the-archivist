@@ -92,7 +92,7 @@ async def delete_document(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    deleted = await document_service.delete_document(str(document_id), session, settings)
+    deleted = await document_service.delete_document(document_id, session, settings)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
