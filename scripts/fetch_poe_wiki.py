@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Fetch pages from the Path of Exile 2 wiki and upload them to the backend.
+"""Fetch and clean Path of Exile 2 wiki pages; write Markdown to disk.
 
-Discovers all internal links on the main wiki page, fetches each page's
-rendered HTML via the MediaWiki API, converts to Markdown, and uploads
-as .md files through POST /api/documents.
+POE-wiki-specific retrieval: discovers pages from the wiki, fetches HTML
+via the MediaWiki API, converts to Markdown with wiki-specific cleanup
+(strip navboxes, version history, etc.), and writes .md files to an
+output directory. Does not upload; use seed_documents.py to upload.
 
 Usage:
-    python seed_wiki.py
-    python seed_wiki.py --dry-run --output-dir ./wiki_pages
-    python seed_wiki.py --api-url http://localhost:8000 --delay 0.5
+    python fetch_poe_wiki.py --output-dir ./wiki_pages
+    python fetch_poe_wiki.py --output-dir ./wiki_pages --delay 0.5
+    python fetch_poe_wiki.py --output-dir ./wiki_pages --dry-run
 """
 
 from __future__ import annotations
@@ -25,70 +26,12 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify
 
-logger = logging.getLogger("seed_wiki")
+logger = logging.getLogger("fetch_poe_wiki")
 
 WIKI_API = "https://www.poe2wiki.net/api.php"
 MAIN_PAGE = "Path_of_Exile_2_Wiki"
-USER_AGENT = "poe2-wiki-seeder/1.0 (notebooklm assessment project)"
+USER_AGENT = "poe2-wiki-fetcher/1.0 (notebooklm assessment project)"
 REQUEST_TIMEOUT = 30.0
-
-
-def discover_page_titles(client: httpx.Client) -> list[str]:
-    """Return titles of all namespace-0 pages linked from the main wiki page."""
-    resp = client.get(
-        WIKI_API,
-        params={
-            "action": "parse",
-            "page": MAIN_PAGE,
-            "prop": "links",
-            "format": "json",
-        },
-    )
-    resp.raise_for_status()
-    data = resp.json()
-
-    links = data["parse"]["links"]
-    titles = [
-        link["*"]
-        for link in links
-        if link.get("ns") == 0 and "exists" in link
-    ]
-    logger.info("Discovered %d page titles from main page", len(titles))
-    return sorted(set(titles))
-
-
-def fetch_page_html(client: httpx.Client, title: str) -> str | None:
-    """Fetch rendered HTML for a single wiki page. Returns None on failure."""
-    try:
-        resp = client.get(
-            WIKI_API,
-            params={
-                "action": "parse",
-                "page": title,
-                "prop": "text",
-                "format": "json",
-            },
-        )
-    except httpx.RequestError as exc:
-        logger.warning("Request failed for '%s': %s", title, exc)
-        return None
-
-    if resp.status_code != 200:
-        logger.warning("HTTP %d fetching page '%s'", resp.status_code, title)
-        return None
-
-    try:
-        data = resp.json()
-    except ValueError:
-        logger.warning("Invalid JSON response for '%s' (len=%d)", title, len(resp.content))
-        return None
-
-    if "error" in data:
-        logger.warning("API error for '%s': %s", title, data["error"].get("info"))
-        return None
-
-    return data["parse"]["text"]["*"]
-
 
 _SKIP_TITLE_PREFIXES = ["Version"]
 
@@ -117,51 +60,84 @@ _REMOVE_SELECTORS = [
 ]
 
 
+def discover_page_titles(client: httpx.Client) -> list[str]:
+    """Return titles of all namespace-0 pages linked from the main wiki page."""
+    resp = client.get(
+        WIKI_API,
+        params={
+            "action": "parse",
+            "page": MAIN_PAGE,
+            "prop": "links",
+            "format": "json",
+        },
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    links = data["parse"]["links"]
+    titles = [
+        link["*"]
+        for link in links
+        if link.get("ns") == 0 and "exists" in link
+    ]
+    logger.info("Discovered %d page titles from main page", len(titles))
+    return sorted(set(titles))
+
+
+def fetch_page_html(client: httpx.Client, title: str) -> str | None:
+    """Fetch rendered HTML for a single wiki page. Returns None on failure."""
+    try:
+        resp = client.get(
+            WIKI_API,
+            params={
+                "action": "parse",
+                "page": title,
+                "prop": "text",
+                "format": "json",
+            },
+        )
+    except httpx.RequestError as exc:
+        logger.warning("Request failed for '%s': %s", title, exc)
+        return None
+    if resp.status_code != 200:
+        logger.warning("HTTP %d fetching page '%s'", resp.status_code, title)
+        return None
+    try:
+        data = resp.json()
+    except ValueError:
+        logger.warning("Invalid JSON for '%s' (len=%d)", title, len(resp.content))
+        return None
+    if "error" in data:
+        logger.warning("API error for '%s': %s", title, data["error"].get("info"))
+        return None
+    return data["parse"]["text"]["*"]
+
+
 def clean_html(html: str) -> str:
     """Strip wiki chrome from parsed HTML, keeping article content."""
     soup = BeautifulSoup(html, "html.parser")
-
     for selector in _REMOVE_SELECTORS:
         for el in soup.select(selector):
             el.decompose()
-
     for el in soup.find_all(class_=re.compile(r"hoverbox_+display|c-tooltip_+display")):
         if isinstance(el, Tag):
             el.decompose()
-
     for img in soup.find_all("img"):
         if isinstance(img, Tag):
             img.decompose()
-
     return str(soup)
 
 
 def should_skip_title(title: str) -> bool:
-    """Return True if a wiki page title should be excluded from seeding."""
+    """Return True if a wiki page title should be excluded."""
     return any(title.startswith(prefix) for prefix in _SKIP_TITLE_PREFIXES)
 
 
 def strip_sections(md: str, headings: Sequence[str]) -> str:
-    """Remove ``##``-level sections whose heading matches any entry in *headings*.
-
-    Matching is case-insensitive. A matched section includes all content
-    from the ``## heading`` line up to (but not including) the next ``## ``
-    heading or the end of the document. Child headings (``###``, ``####``)
-    within the matched section are removed together with their parent.
-
-    Args:
-        md: Markdown text to filter.
-        headings: Lowercase heading names to strip (e.g. ``["version history"]``).
-
-    Returns:
-        Filtered markdown with matched sections removed.
-    """
+    """Remove ##-level sections whose heading matches any entry in *headings* (case-insensitive)."""
     if not md or not headings:
         return md
-
     headings_lower = set(headings)
     fragments = re.split(r"^(?=## )", md, flags=re.MULTILINE)
-
     kept: list[str] = []
     for fragment in fragments:
         first_line = fragment.split("\n", 1)[0]
@@ -169,7 +145,6 @@ def strip_sections(md: str, headings: Sequence[str]) -> str:
         if heading_match and heading_match.group(1).strip().lower() in headings_lower:
             continue
         kept.append(fragment)
-
     return "".join(kept).strip()
 
 
@@ -177,12 +152,10 @@ def html_to_markdown(html: str, title: str) -> str:
     """Convert cleaned HTML to Markdown with a title header."""
     cleaned = clean_html(html)
     md: str = markdownify(cleaned, heading_style="ATX", strip=["img"])
-
     md = re.sub(r"\n{3,}", "\n\n", md)
     md = re.sub(r"[ \t]+$", "", md, flags=re.MULTILINE)
     md = md.strip()
     md = strip_sections(md, _STRIP_SECTION_HEADINGS)
-
     return f"# {title}\n\n{md}\n"
 
 
@@ -194,48 +167,17 @@ def sanitize_filename(title: str) -> str:
     return f"{name}.md"
 
 
-def upload_file(
-    client: httpx.Client,
-    api_url: str,
-    filename: str,
-    content: str,
-) -> bool:
-    """Upload a Markdown document to the backend. Returns True on success."""
-    url = f"{api_url.rstrip('/')}/api/documents"
-    files = {"file": (filename, content.encode("utf-8"), "text/markdown")}
-
-    try:
-        resp = client.post(url, files=files)
-    except httpx.RequestError as exc:
-        logger.error("Upload failed for '%s': %s", filename, exc)
-        return False
-
-    if resp.status_code == 201:
-        return True
-
-    logger.error(
-        "Upload returned %d for '%s': %s",
-        resp.status_code,
-        filename,
-        resp.text[:200],
-    )
-    return False
-
-
 def run(args: argparse.Namespace) -> int:
-    """Main entry point. Returns 0 on success, 1 if any pages failed."""
-    output_dir: Path | None = Path(args.output_dir) if args.output_dir else None
-    if output_dir:
-        output_dir.mkdir(parents=True, exist_ok=True)
+    """Main entry point. Returns 0 on success, 1 if any fetch failed."""
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    wiki_client = httpx.Client(
+    client = httpx.Client(
         headers={"User-Agent": USER_AGENT},
         timeout=REQUEST_TIMEOUT,
     )
-    upload_client = httpx.Client(timeout=60.0)
-
     try:
-        titles = discover_page_titles(wiki_client)
+        titles = discover_page_titles(client)
         if not titles:
             logger.error("No pages discovered — nothing to do")
             return 1
@@ -251,75 +193,54 @@ def run(args: argparse.Namespace) -> int:
                 continue
 
             filename = sanitize_filename(title)
+            out_path = output_dir / filename
             log_prefix = f"[{i}/{len(titles)}] {title}"
 
-            if output_dir and (output_dir / filename).exists():
+            if out_path.exists():
                 logger.info("%s — cached on disk, skipping fetch", log_prefix)
-                content = (output_dir / filename).read_text(encoding="utf-8")
                 skipped += 1
-            else:
-                logger.info("%s — fetching", log_prefix)
-                html = fetch_page_html(wiki_client, title)
-                if html is None:
-                    failed += 1
-                    continue
-
-                content = html_to_markdown(html, title)
-
-                if output_dir:
-                    (output_dir / filename).write_text(content, encoding="utf-8")
-
-                if i < len(titles):
-                    time.sleep(args.delay)
-
-            if args.dry_run:
-                logger.info("%s — dry run, skipping upload", log_prefix)
-                succeeded += 1
                 continue
 
-            logger.info("%s — uploading as %s", log_prefix, filename)
-            if upload_file(upload_client, args.api_url, filename, content):
-                succeeded += 1
-            else:
+            logger.info("%s — fetching", log_prefix)
+            html = fetch_page_html(client, title)
+            if html is None:
                 failed += 1
+                continue
 
-        logger.info(
-            "Done: %d succeeded, %d failed, %d skipped (cached)",
-            succeeded,
-            failed,
-            skipped,
-        )
+            content = html_to_markdown(html, title)
+            if not args.dry_run:
+                out_path.write_text(content, encoding="utf-8")
+            succeeded += 1
+
+            if i < len(titles):
+                time.sleep(args.delay)
+
+        logger.info("Done: %d written, %d failed, %d skipped (cached)", succeeded, failed, skipped)
         return 0 if failed == 0 else 1
-
     finally:
-        wiki_client.close()
-        upload_client.close()
+        client.close()
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Seed the vector DB with Path of Exile 2 wiki pages.",
-    )
-    parser.add_argument(
-        "--api-url",
-        default="http://localhost:8000",
-        help="Backend base URL (default: http://localhost:8000)",
+        description="Fetch Path of Exile 2 wiki pages and write Markdown to disk.",
     )
     parser.add_argument(
         "--output-dir",
-        default=None,
-        help="Save .md files to this directory (enables caching for re-runs)",
+        required=True,
+        metavar="DIR",
+        help="Directory to write .md files to (used as cache for re-runs)",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Fetch and convert pages but skip uploading to the backend",
+        help="Discover and fetch but do not write files",
     )
     parser.add_argument(
         "--delay",
         type=float,
         default=1.0,
-        help="Seconds to wait between wiki API requests (default: 1.0)",
+        help="Seconds between wiki API requests (default: 1.0)",
     )
     return parser.parse_args(argv)
 
@@ -330,8 +251,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%H:%M:%S",
     )
-    args = parse_args(argv)
-    return run(args)
+    return run(parse_args(argv))
 
 
 if __name__ == "__main__":

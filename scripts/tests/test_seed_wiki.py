@@ -1,10 +1,10 @@
-"""Tests for wiki seeder content-filtering functions."""
+"""Tests for POE wiki retrieval content-filtering functions."""
 
 from __future__ import annotations
 
 import pytest
 
-from seed_wiki import should_skip_title, strip_sections
+from fetch_poe_wiki import should_skip_title, strip_sections
 
 
 # ---------------------------------------------------------------------------

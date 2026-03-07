@@ -45,4 +45,4 @@ data/
 .cache/
 tmp/
 .docs/internal*
-wiki_pages/*
+scripts/wiki_pages/*
