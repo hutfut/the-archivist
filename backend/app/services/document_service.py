@@ -45,7 +45,9 @@ async def save_document(
     session.add(doc)
     await session.flush()
 
-    chunk_count = await processor.process(doc_id, file_path, content_type, session)
+    chunk_count = await processor.process(
+        doc_id, file_path, content_type, session, filename=filename,
+    )
     doc.chunk_count = chunk_count
 
     await session.commit()

@@ -2,6 +2,7 @@ from app.services.embedding import EMBEDDING_DIMENSION, MockEmbeddingService
 from app.services.processing import (
     DEFAULT_CHUNK_SIZE,
     ChunkWithHeading,
+    build_embedding_text,
     chunk_markdown,
     chunk_text,
 )
@@ -108,6 +109,37 @@ class TestMarkdownChunking:
         chunks = chunk_markdown(md)
         all_content = " ".join(c.content for c in chunks)
         assert "quick brown fox" in all_content
+
+
+class TestBuildEmbeddingText:
+    def test_with_heading(self):
+        result = build_embedding_text(
+            "Specializes in occult spells.",
+            "Witch.md",
+            "Ascendancy classes",
+        )
+        assert result == "Witch > Ascendancy classes: Specializes in occult spells."
+
+    def test_without_heading(self):
+        result = build_embedding_text(
+            "Some plain content.",
+            "Witch.md",
+        )
+        assert result == "Witch: Some plain content."
+
+    def test_strips_extension(self):
+        result = build_embedding_text("Content.", "Character class.md")
+        assert result.startswith("Character class:")
+
+    def test_non_markdown_extension(self):
+        result = build_embedding_text("Content.", "manual.pdf")
+        assert result.startswith("manual:")
+
+    def test_stored_content_unchanged(self):
+        """Verify build_embedding_text does not mutate the input content."""
+        original = "The Witch is an intelligence-oriented class."
+        _ = build_embedding_text(original, "Witch.md", "Overview")
+        assert original == "The Witch is an intelligence-oriented class."
 
 
 class TestMockEmbeddingService:

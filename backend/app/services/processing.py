@@ -138,6 +138,7 @@ class DocumentProcessor(Protocol):
         file_path: Path,
         content_type: str,
         session: AsyncSession,
+        filename: str = "",
     ) -> int:
         """Process a document: extract text, chunk, embed, store.
 
@@ -148,6 +149,28 @@ class DocumentProcessor(Protocol):
 
 def _is_markdown(content_type: str) -> bool:
     return content_type == "text/markdown"
+
+
+def _document_title(filename: str) -> str:
+    """Derive a human-readable title from a filename (strip extension)."""
+    return Path(filename).stem
+
+
+def build_embedding_text(
+    content: str,
+    filename: str,
+    section_heading: str | None = None,
+) -> str:
+    """Prepend document title and section heading to chunk content for embedding.
+
+    The prefix gives the embedding model contextual signal about which
+    document and section the chunk belongs to, improving retrieval
+    precision for entity-specific queries.
+    """
+    title = _document_title(filename)
+    if section_heading:
+        return f"{title} > {section_heading}: {content}"
+    return f"{title}: {content}"
 
 
 class PipelineProcessor:
@@ -162,8 +185,12 @@ class PipelineProcessor:
         file_path: Path,
         content_type: str,
         session: AsyncSession,
+        filename: str = "",
     ) -> int:
         from app.db.models import Chunk
+
+        if not filename:
+            filename = file_path.name
 
         try:
             text = extract_text(file_path, content_type)
@@ -187,8 +214,11 @@ class PipelineProcessor:
         if not chunks_with_headings:
             return 0
 
-        texts = [c.content for c in chunks_with_headings]
-        embeddings = self._embedding_service.embed_texts(texts)
+        embedding_texts = [
+            build_embedding_text(c.content, filename, c.section_heading)
+            for c in chunks_with_headings
+        ]
+        embeddings = self._embedding_service.embed_texts(embedding_texts)
 
         now = datetime.now(timezone.utc)
         for i, (cwh, embedding) in enumerate(zip(chunks_with_headings, embeddings)):
