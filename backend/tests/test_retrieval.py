@@ -228,3 +228,18 @@ class TestRRFMerge:
         list_b = [_chunk(doc_id="d1", index=0, content="Content", score=0.7)]
         result = rrf_merge([list_a, list_b])
         assert len(result) == 1
+
+    def test_normalized_scores_in_zero_one_range(self):
+        """RRF scores should be normalized to [0, 1]."""
+        shared = _chunk(doc_id="d1", index=0, content="Top", score=0.9)
+        list_a = [shared, _chunk(doc_id="d2", index=0, content="A", score=0.8)]
+        list_b = [shared, _chunk(doc_id="d3", index=0, content="B", score=0.7)]
+        result = rrf_merge([list_a, list_b])
+        for chunk in result:
+            assert 0.0 < chunk.similarity_score <= 1.0
+
+    def test_rank_one_in_all_lists_approaches_one(self):
+        """A chunk ranked #1 in all lists should score close to 1.0."""
+        shared = _chunk(doc_id="d1", index=0, content="Top", score=0.9)
+        result = rrf_merge([[shared], [shared]])
+        assert result[0].similarity_score == 1.0

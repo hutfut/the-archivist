@@ -151,9 +151,15 @@ def rrf_merge(
     """Merge multiple ranked result lists using Reciprocal Rank Fusion.
 
     Each chunk's RRF score is the sum of 1/(k + rank) across all lists it
-    appears in, where rank is 1-indexed. Chunks are identified by
-    (document_id, chunk_index) to deduplicate across lists.
+    appears in, where rank is 1-indexed. Scores are normalized to [0, 1]
+    by dividing by the theoretical maximum (all lists rank the chunk #1).
+    Chunks are identified by (document_id, chunk_index) to deduplicate
+    across lists.
     """
+    n_lists = len(ranked_lists)
+    if n_lists == 0:
+        return []
+
     scores: dict[tuple[str, int], float] = {}
     chunk_map: dict[tuple[str, int], RetrievedChunk] = {}
 
@@ -164,9 +170,13 @@ def rrf_merge(
             if key not in chunk_map or chunk.similarity_score > chunk_map[key].similarity_score:
                 chunk_map[key] = chunk
 
+    max_rrf = n_lists / (rrf_k + 1)
+    if max_rrf == 0:
+        max_rrf = 1.0
+
     sorted_keys = sorted(scores.keys(), key=lambda k: scores[k], reverse=True)
     return [
-        replace(chunk_map[key], similarity_score=scores[key])
+        replace(chunk_map[key], similarity_score=scores[key] / max_rrf)
         for key in sorted_keys
     ]
 
@@ -231,13 +241,30 @@ class RetrievalService:
             for row in result.all()
         ]
 
+    @staticmethod
+    def _build_or_tsquery(query: str) -> Any:
+        """Build an OR-based tsquery with proper stemming.
+
+        plainto_tsquery uses AND logic, which is too strict for natural
+        language questions (no single chunk contains all query terms).
+        Instead, we build individual plainto_tsquery per word and combine
+        with || (OR) so partial matches contribute to ranking.
+        """
+        words = [w.strip() for w in query.split() if len(w.strip()) > 1]
+        if not words:
+            return func.plainto_tsquery("english", query)
+
+        from functools import reduce
+        word_queries = [func.plainto_tsquery("english", w) for w in words]
+        return reduce(lambda a, b: a.op("||")(b), word_queries)
+
     async def _keyword_search(
         self,
         query: str,
         session: AsyncSession,
         candidate_k: int,
     ) -> list[RetrievedChunk]:
-        ts_query = func.plainto_tsquery("english", query)
+        ts_query = self._build_or_tsquery(query)
         rank_expr = func.ts_rank(Chunk.search_vector, ts_query).label("rank")
 
         stmt = (

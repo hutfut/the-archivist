@@ -34,17 +34,18 @@ Three independent improvements are proposed: hybrid search, chunk context enrich
 
 ## Decision
 
-- **Hybrid search**: Option 3 — Vector + BM25 with RRF. Add a `search_vector` tsvector column (GIN-indexed) to the chunks table, populated at ingestion time. At query time, run both vector similarity and full-text search, combine with RRF (k=60). Configurable via `RETRIEVAL_MODE` env var (`"hybrid"`, `"vector"`, `"keyword"`; default `"hybrid"`).
+- **Hybrid search**: Option 3 — Vector + BM25 with RRF. Add a `search_vector` tsvector column (GIN-indexed) to the chunks table, populated at ingestion time. At query time, run both vector similarity and full-text search, combine with RRF (k=60). RRF scores are normalized to [0, 1] so the similarity threshold works uniformly across retrieval modes. Keyword search uses OR logic (combining per-word `plainto_tsquery` with `||`) so natural language questions with many terms still match partial content. Configurable via `RETRIEVAL_MODE` env var (`"hybrid"`, `"vector"`, `"keyword"`; default `"hybrid"`).
 
-- **Chunk context enrichment**: Option 2 — Prepend document title and section heading. The prefix is only used for embedding; stored content is unchanged.
+- **Chunk context enrichment**: Option 2 was implemented and tested but **reverted**. `all-MiniLM-L6-v2` is a symmetric model -- prepending a title prefix to documents (but not queries) catastrophically reduced cosine similarity (from ~0.8 to 0.016). The `build_embedding_text` utility remains in the codebase for future use with asymmetric retrieval models (e.g., BGE, E5). Hybrid search provides the keyword-level entity discrimination that enrichment was intended to deliver.
 
 - **Query rewriting**: Option 2 — New `rewrite_query` node in the LangGraph agent. Passthrough with mock LLM, multi-query with Ollama. Results from multiple queries are merged and deduplicated.
 
 ## Consequences
 
 - **Schema migration required**: New nullable `search_vector` column on `chunks` with a GIN index.
-- **Re-seed required**: All documents must be re-processed to populate tsvector and generate context-enriched embeddings.
+- **Re-seed required**: All documents must be re-processed to populate tsvector columns.
 - **No new Python dependencies**: PostgreSQL full-text search, `to_tsvector`, `ts_rank` are built-in. SQLAlchemy already exposes `func.to_tsvector` and `func.ts_rank`.
 - **Two queries per search in hybrid mode**: Negligible performance impact for the corpus size (~153 documents). Each query hits an index (GIN for tsvector, IVFFlat/HNSW for vector).
 - **Backward compatible**: `RETRIEVAL_MODE=vector` reproduces the pre-change behavior exactly.
 - **Query rewriting is a no-op with mock LLM**: The node exists in the graph (testable, demonstrates extensibility) but doesn't alter the query.
+- **Embedding enrichment deferred**: The symmetric embedding model cannot benefit from document-level prefixes without also prefixing queries. This would work with asymmetric models and is documented as a future improvement.

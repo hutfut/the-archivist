@@ -162,11 +162,13 @@ def build_embedding_text(
     filename: str,
     section_heading: str | None = None,
 ) -> str:
-    """Prepend document title and section heading to chunk content for embedding.
+    """Prepend document title and section heading to chunk content.
 
-    The prefix gives the embedding model contextual signal about which
-    document and section the chunk belongs to, improving retrieval
-    precision for entity-specific queries.
+    Intended for use with asymmetric retrieval models where queries and
+    documents are encoded differently. Not currently used for embeddings
+    because all-MiniLM-L6-v2 is symmetric -- the title prefix degrades
+    cosine similarity when queries lack the same prefix. Kept as a
+    utility for future model upgrades.
     """
     title = _document_title(filename)
     if section_heading:
@@ -215,11 +217,8 @@ class PipelineProcessor:
         if not chunks_with_headings:
             return 0
 
-        embedding_texts = [
-            build_embedding_text(c.content, filename, c.section_heading)
-            for c in chunks_with_headings
-        ]
-        embeddings = self._embedding_service.embed_texts(embedding_texts)
+        texts = [c.content for c in chunks_with_headings]
+        embeddings = self._embedding_service.embed_texts(texts)
 
         now = datetime.now(timezone.utc)
         for i, (cwh, embedding) in enumerate(zip(chunks_with_headings, embeddings)):
