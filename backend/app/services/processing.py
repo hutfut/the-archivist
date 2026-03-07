@@ -11,6 +11,7 @@ from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
+from sqlalchemy import func
 
 from app.services.text_extraction import extract_text
 
@@ -229,6 +230,7 @@ class PipelineProcessor:
                 content=cwh.content,
                 section_heading=cwh.section_heading,
                 embedding=embedding,
+                search_vector=func.to_tsvector("english", cwh.content),
                 created_at=now,
             )
             session.add(chunk)

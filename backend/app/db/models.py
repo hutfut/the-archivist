@@ -3,7 +3,7 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.dialects.postgresql import JSON, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -28,6 +28,7 @@ class Chunk(Base):
     __tablename__ = "chunks"
     __table_args__ = (
         Index("ix_chunks_document_id", "document_id"),
+        Index("ix_chunks_search_vector", "search_vector", postgresql_using="gin"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -38,6 +39,7 @@ class Chunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     section_heading: Mapped[str | None] = mapped_column(String, nullable=True)
     embedding = mapped_column(Vector(384), nullable=False)
+    search_vector = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

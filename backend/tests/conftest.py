@@ -53,7 +53,7 @@ async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
     mock_embeddings = MockEmbeddingService()
     init_processor(mock_embeddings)
 
-    retrieval_service = RetrievalService(mock_embeddings)
+    retrieval_service = RetrievalService(mock_embeddings, retrieval_mode="vector")
     mock_llm = MockChatModel()
     agent_graph = build_agent_graph(
         retrieval_service=retrieval_service,

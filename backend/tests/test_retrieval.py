@@ -1,4 +1,4 @@
-from app.services.retrieval import RetrievedChunk, deduplicate_chunks
+from app.services.retrieval import RetrievedChunk, deduplicate_chunks, rrf_merge
 
 
 def _chunk(
@@ -174,3 +174,57 @@ class TestDeduplicateChunks:
         result = deduplicate_chunks(chunks, final_k=5)
         scores = [c.similarity_score for c in result]
         assert scores == sorted(scores, reverse=True)
+
+
+class TestRRFMerge:
+    def test_single_list_preserves_order(self):
+        chunks = [
+            _chunk(doc_id="d1", index=0, content="First", score=0.9),
+            _chunk(doc_id="d2", index=0, content="Second", score=0.8),
+        ]
+        result = rrf_merge([chunks])
+        assert result[0].document_id == "d1"
+        assert result[1].document_id == "d2"
+
+    def test_chunk_in_both_lists_scores_higher(self):
+        shared = _chunk(doc_id="d1", index=0, content="Shared", score=0.9)
+        only_vector = _chunk(doc_id="d2", index=0, content="Vector only", score=0.85)
+        only_keyword = _chunk(doc_id="d3", index=0, content="Keyword only", score=0.8)
+
+        vector_list = [shared, only_vector]
+        keyword_list = [shared, only_keyword]
+
+        result = rrf_merge([vector_list, keyword_list])
+        assert result[0].document_id == "d1"
+
+    def test_disjoint_lists_interleaved(self):
+        vector_list = [
+            _chunk(doc_id="d1", index=0, content="V1", score=0.9),
+            _chunk(doc_id="d2", index=0, content="V2", score=0.8),
+        ]
+        keyword_list = [
+            _chunk(doc_id="d3", index=0, content="K1", score=0.9),
+            _chunk(doc_id="d4", index=0, content="K2", score=0.8),
+        ]
+        result = rrf_merge([vector_list, keyword_list])
+        assert len(result) == 4
+
+    def test_empty_lists(self):
+        result = rrf_merge([[], []])
+        assert result == []
+
+    def test_rrf_scores_are_positive(self):
+        chunks = [
+            _chunk(doc_id="d1", index=0, content="A", score=0.9),
+            _chunk(doc_id="d2", index=0, content="B", score=0.5),
+        ]
+        result = rrf_merge([chunks])
+        for chunk in result:
+            assert chunk.similarity_score > 0
+
+    def test_dedup_by_doc_id_and_chunk_index(self):
+        """Same (doc_id, chunk_index) across lists is treated as one chunk."""
+        list_a = [_chunk(doc_id="d1", index=0, content="Content", score=0.9)]
+        list_b = [_chunk(doc_id="d1", index=0, content="Content", score=0.7)]
+        result = rrf_merge([list_a, list_b])
+        assert len(result) == 1

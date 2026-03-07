@@ -32,7 +32,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     embedding_service = HuggingFaceEmbeddingService(settings.embedding_model)
     init_processor(embedding_service)
 
-    retrieval_service = RetrievalService(embedding_service)
+    retrieval_service = RetrievalService(
+        embedding_service, retrieval_mode=settings.retrieval_mode,
+    )
     llm = create_llm(settings)
     agent_graph = build_agent_graph(
         retrieval_service=retrieval_service,

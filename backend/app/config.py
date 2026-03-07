@@ -47,6 +47,9 @@ class Settings:
     retrieval_candidate_k: int = field(
         default_factory=lambda: int(os.environ.get("RETRIEVAL_CANDIDATE_K", "20"))
     )
+    retrieval_mode: str = field(
+        default_factory=lambda: os.environ.get("RETRIEVAL_MODE", "hybrid")
+    )
 
 
 @lru_cache(maxsize=1)

@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from itertools import groupby
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.sql.expression import literal_column
 
 from app.db.models import Chunk, Document
@@ -141,31 +141,61 @@ def deduplicate_chunks(
     return result[:final_k]
 
 
-class RetrievalService:
-    """Retrieves relevant document chunks via pgvector cosine similarity.
+_RRF_K = 60
 
-    Uses direct SQLAlchemy queries against the existing chunks table
-    with pgvector's <=> cosine distance operator, joined to the documents
-    table for filename attribution. Applies post-retrieval deduplication
-    to maximize context diversity.
+
+def rrf_merge(
+    ranked_lists: list[list[RetrievedChunk]],
+    rrf_k: int = _RRF_K,
+) -> list[RetrievedChunk]:
+    """Merge multiple ranked result lists using Reciprocal Rank Fusion.
+
+    Each chunk's RRF score is the sum of 1/(k + rank) across all lists it
+    appears in, where rank is 1-indexed. Chunks are identified by
+    (document_id, chunk_index) to deduplicate across lists.
+    """
+    scores: dict[tuple[str, int], float] = {}
+    chunk_map: dict[tuple[str, int], RetrievedChunk] = {}
+
+    for ranked_list in ranked_lists:
+        for rank, chunk in enumerate(ranked_list, start=1):
+            key = (chunk.document_id, chunk.chunk_index)
+            scores[key] = scores.get(key, 0.0) + 1.0 / (rrf_k + rank)
+            if key not in chunk_map or chunk.similarity_score > chunk_map[key].similarity_score:
+                chunk_map[key] = chunk
+
+    sorted_keys = sorted(scores.keys(), key=lambda k: scores[k], reverse=True)
+    return [
+        replace(chunk_map[key], similarity_score=scores[key])
+        for key in sorted_keys
+    ]
+
+
+class RetrievalService:
+    """Retrieves relevant document chunks via hybrid search.
+
+    Supports three retrieval modes:
+    - "vector": pgvector cosine similarity only (original behavior)
+    - "keyword": PostgreSQL full-text search only (BM25 via ts_rank)
+    - "hybrid": both, merged with Reciprocal Rank Fusion (default)
+
+    All modes apply post-retrieval deduplication to maximize context diversity.
     """
 
-    def __init__(self, embedding_service: EmbeddingService) -> None:
+    def __init__(
+        self,
+        embedding_service: EmbeddingService,
+        retrieval_mode: str = "hybrid",
+    ) -> None:
         self._embedding_service = embedding_service
+        self._retrieval_mode = retrieval_mode
 
-    async def search(
+    async def _vector_search(
         self,
         query: str,
         session: AsyncSession,
-        top_k: int = 5,
-        candidate_k: int = 10,
+        candidate_k: int,
     ) -> list[RetrievedChunk]:
-        """Find the top-k most similar chunks to the query.
-
-        Over-fetches candidate_k results, then deduplicates down to top_k.
-        Returns chunks ordered by similarity (highest first). The similarity
-        score is 1 - cosine_distance, so higher is better.
-        """
         query_embedding = self._embedding_service.embed_query(query)
         embedding_literal = f"[{','.join(str(v) for v in query_embedding)}]"
 
@@ -189,9 +219,7 @@ class RetrievalService:
         )
 
         result = await session.execute(stmt)
-        rows = result.all()
-
-        candidates = [
+        return [
             RetrievedChunk(
                 document_id=row.document_id,
                 filename=row.filename,
@@ -200,8 +228,78 @@ class RetrievalService:
                 similarity_score=float(row.similarity),
                 section_heading=row.section_heading,
             )
-            for row in rows
+            for row in result.all()
         ]
+
+    async def _keyword_search(
+        self,
+        query: str,
+        session: AsyncSession,
+        candidate_k: int,
+    ) -> list[RetrievedChunk]:
+        ts_query = func.plainto_tsquery("english", query)
+        rank_expr = func.ts_rank(Chunk.search_vector, ts_query).label("rank")
+
+        stmt = (
+            select(
+                Chunk.document_id,
+                Document.filename,
+                Chunk.content,
+                Chunk.chunk_index,
+                Chunk.section_heading,
+                rank_expr,
+            )
+            .join(Document, Chunk.document_id == Document.id)
+            .where(Chunk.search_vector.op("@@")(ts_query))
+            .order_by(rank_expr.desc())
+            .limit(candidate_k)
+        )
+
+        result = await session.execute(stmt)
+        return [
+            RetrievedChunk(
+                document_id=row.document_id,
+                filename=row.filename,
+                chunk_content=row.content,
+                chunk_index=row.chunk_index,
+                similarity_score=float(row.rank),
+                section_heading=row.section_heading,
+            )
+            for row in result.all()
+        ]
+
+    async def search(
+        self,
+        query: str,
+        session: AsyncSession,
+        top_k: int = 5,
+        candidate_k: int = 20,
+    ) -> list[RetrievedChunk]:
+        """Find the top-k most relevant chunks using the configured retrieval mode.
+
+        Over-fetches candidate_k results per source, then deduplicates down
+        to top_k. In hybrid mode, vector and keyword results are merged via
+        Reciprocal Rank Fusion before deduplication.
+        """
+        mode = self._retrieval_mode
+
+        if mode == "vector":
+            candidates = await self._vector_search(query, session, candidate_k)
+        elif mode == "keyword":
+            candidates = await self._keyword_search(query, session, candidate_k)
+        elif mode == "hybrid":
+            vector_results = await self._vector_search(query, session, candidate_k)
+            keyword_results = await self._keyword_search(query, session, candidate_k)
+            candidates = rrf_merge([vector_results, keyword_results])
+            logger.info(
+                "Hybrid search: %d vector + %d keyword -> %d merged for query: %.80s",
+                len(vector_results),
+                len(keyword_results),
+                len(candidates),
+                query,
+            )
+        else:
+            raise ValueError(f"Unknown retrieval_mode: {mode!r}")
 
         deduped = deduplicate_chunks(candidates, final_k=top_k)
         logger.info(
