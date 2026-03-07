@@ -1,0 +1,53 @@
+---
+description: Enforces the required structure and sections for implementation plan files
+alwaysApply: true
+---
+
+# Plan File Format
+
+When creating an implementation plan (in `.cursor/plans/`), use this structure exactly.
+
+## Frontmatter
+
+```yaml
+---
+name: <Plan Title>
+overview: "<One-sentence summary of what is being built, stack, and milestone count>"
+todos:
+  - id: <short-kebab-id>
+    content: "<Milestone N: title -- brief scope description>"
+    status: pending
+isProject: false
+---
+```
+
+Each todo maps 1:1 to a milestone. All start as `pending`.
+
+## Required Sections (in order)
+
+### 1. Requirements Summary
+Bulleted list distilled from the prompt/requirements source. Link to the source document. Focus on what must be built, constraints, and evaluation criteria.
+
+### 2. Ambiguities and Assumptions
+Table with columns: **Area**, **Ambiguity**, **Assumption**. One row per ambiguity. State the assumption you are proceeding with and why.
+
+### 3. High-Level Architecture
+- Mermaid diagram showing major components and their interactions
+- **Key modules** list mapping directory paths to responsibilities
+- Additional diagrams for complex subsystems (e.g., agent graph, data flow)
+- **Data model** with table/collection schemas (fields, types, relationships)
+
+### 4. ADRs to Write
+Numbered list of ADRs to create before implementing the relevant milestone. Each entry names the decision topic.
+
+### 5. Milestones
+One subsection per milestone, separated by `---`. Each milestone includes:
+- **Goal**: One sentence stating what is true when the milestone is done
+- **Implementation details**: Bullet list of concrete tasks (endpoints, components, config)
+- **Tests**: Bullet list of test cases covering happy path, edge cases, and errors
+- **Commits**: Estimated commit count with brief descriptions
+
+Milestones should be ordered so each is independently committable and leaves the project in a runnable state.
+
+### 6. Dependency Summary
+Group by project area (e.g., Backend, Frontend). List each dependency with a short justification (role it fills).

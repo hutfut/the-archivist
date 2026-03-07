@@ -11,3 +11,4 @@ alwaysApply: true
 - When multiple approaches exist, present trade-offs (complexity, performance, maintainability) and recommend one with rationale
 - Reference @PROMPT.md for the original assessment requirements -- do not drift from them
 - After planning, confirm the approach before proceeding to implementation
+- When creating a plan file, follow the structure defined in @.cursor/rules/plan-format.mdc
