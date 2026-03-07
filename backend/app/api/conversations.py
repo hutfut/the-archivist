@@ -63,10 +63,10 @@ async def list_conversations(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationListResponse:
-    conversations = await conversation_service.list_conversations(
+    conversations, total = await conversation_service.list_conversations(
         session, limit=limit, offset=offset,
     )
-    return ConversationListResponse(conversations=conversations)
+    return ConversationListResponse(conversations=conversations, total=total)
 
 
 @router.get(

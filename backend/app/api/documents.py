@@ -78,8 +78,8 @@ async def list_documents(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentListResponse:
-    docs = await document_service.list_documents(session, limit=limit, offset=offset)
-    return DocumentListResponse(documents=docs)
+    docs, total = await document_service.list_documents(session, limit=limit, offset=offset)
+    return DocumentListResponse(documents=docs, total=total)
 
 
 @router.delete(

@@ -33,6 +33,7 @@ class ConversationResponse(BaseModel):
 
 class ConversationListResponse(BaseModel):
     conversations: list[ConversationResponse]
+    total: int
 
 
 class ConversationDetailResponse(ConversationResponse):

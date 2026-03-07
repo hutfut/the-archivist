@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.db.models import Conversation, Message
 from app.models.conversation import (
@@ -41,7 +41,7 @@ async def list_conversations(
     session: AsyncSession,
     limit: int = 50,
     offset: int = 0,
-) -> list[ConversationResponse]:
+) -> tuple[list[ConversationResponse], int]:
     stmt = (
         select(Conversation)
         .order_by(Conversation.updated_at.desc())
@@ -50,7 +50,11 @@ async def list_conversations(
     )
     result = await session.execute(stmt)
     rows = result.scalars().all()
-    return [ConversationResponse.model_validate(row) for row in rows]
+
+    count_result = await session.execute(select(func.count()).select_from(Conversation))
+    total = count_result.scalar_one()
+
+    return [ConversationResponse.model_validate(row) for row in rows], total
 
 
 async def get_conversation(

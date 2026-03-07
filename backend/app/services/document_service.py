@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import EXTENSION_TO_CONTENT_TYPE, Settings
@@ -69,8 +69,8 @@ async def list_documents(
     session: AsyncSession,
     limit: int = 50,
     offset: int = 0,
-) -> list[DocumentResponse]:
-    """Return documents ordered by creation time (newest first)."""
+) -> tuple[list[DocumentResponse], int]:
+    """Return documents ordered by creation time (newest first) and total count."""
     stmt = (
         select(Document)
         .order_by(Document.created_at.desc())
@@ -79,7 +79,11 @@ async def list_documents(
     )
     result = await session.execute(stmt)
     rows = result.scalars().all()
-    return [DocumentResponse.model_validate(row) for row in rows]
+
+    count_result = await session.execute(select(func.count()).select_from(Document))
+    total = count_result.scalar_one()
+
+    return [DocumentResponse.model_validate(row) for row in rows], total
 
 
 async def get_document(

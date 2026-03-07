@@ -54,7 +54,7 @@ async def test_list_documents_empty(client: AsyncClient) -> None:
     response = await client.get("/api/documents")
 
     assert response.status_code == 200
-    assert response.json() == {"documents": []}
+    assert response.json() == {"documents": [], "total": 0}
 
 
 async def test_list_documents_after_uploads(client: AsyncClient) -> None:
