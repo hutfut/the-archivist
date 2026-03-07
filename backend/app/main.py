@@ -1,15 +1,29 @@
+import contextvars
 import logging
 import os
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+
+request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
+
+
+class _RequestIDFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_ctx.get("")  # type: ignore[attr-defined]
+        return True
+
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
-    format="%(levelname)s  %(name)s: %(message)s",
+    format="%(levelname)s  [request_id=%(request_id)s] %(name)s: %(message)s",
 )
+for _handler in logging.getLogger().handlers:
+    _handler.addFilter(_RequestIDFilter())
 
 from app.agent.graph import build_agent_graph
 from app.agent.llm import create_llm
@@ -52,9 +66,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        rid = str(uuid.uuid4())
+        request_id_ctx.set(rid)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="NotebookLM", version="0.1.0", lifespan=lifespan)
 
+    app.add_middleware(RequestIDMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173"],
