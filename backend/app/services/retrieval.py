@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, replace
+from functools import reduce
 from itertools import groupby
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.sql.expression import literal_column
 
 from app.db.models import Chunk, Document
@@ -242,7 +244,7 @@ class RetrievalService:
         ]
 
     @staticmethod
-    def _build_or_tsquery(query: str) -> Any:
+    def _build_or_tsquery(query: str) -> ColumnElement[bool]:
         """Build an OR-based tsquery with proper stemming.
 
         plainto_tsquery uses AND logic, which is too strict for natural
@@ -254,7 +256,6 @@ class RetrievalService:
         if not words:
             return func.plainto_tsquery("english", query)
 
-        from functools import reduce
         word_queries = [func.plainto_tsquery("english", w) for w in words]
         return reduce(lambda a, b: a.op("||")(b), word_queries)
 
