@@ -9,6 +9,7 @@ import {
 import { ApiError } from "../api/errors.ts";
 
 export const PAGE_SIZE = 24;
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 export interface UseDocumentsReturn {
   documents: DocumentResponse[];
@@ -65,6 +66,10 @@ export function useDocuments(): UseDocumentsReturn {
     }
     if (file.size === 0) {
       setError("File is empty");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError("File too large. Maximum size is 50 MB.");
       return;
     }
 

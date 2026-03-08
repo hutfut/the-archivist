@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useDocuments, PAGE_SIZE } from "../useDocuments";
+import { useDocuments, PAGE_SIZE, MAX_UPLOAD_BYTES } from "../useDocuments";
 import * as documentsApi from "../../api/documents";
 import { ApiError } from "../../api/errors";
 
@@ -74,6 +74,21 @@ describe("useDocuments", () => {
     });
 
     expect(result.current.error).toBe("Unsupported file type. Allowed: .pdf, .txt, .md");
+    expect(mockUploadDocument).not.toHaveBeenCalled();
+  });
+
+  it("upload rejects oversized file", async () => {
+    const { result } = renderHook(() => useDocuments());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const content = new ArrayBuffer(MAX_UPLOAD_BYTES + 1);
+    const file = new File([content], "huge.pdf", { type: "application/pdf" });
+
+    await act(async () => {
+      await result.current.upload(file);
+    });
+
+    expect(result.current.error).toBe("File too large. Maximum size is 50 MB.");
     expect(mockUploadDocument).not.toHaveBeenCalled();
   });
 
