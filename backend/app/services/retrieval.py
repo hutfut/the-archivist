@@ -61,7 +61,7 @@ def _merge_adjacent_chunks(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]
         doc_groups.setdefault(chunk.document_id, []).append(chunk)
 
     merged: list[RetrievedChunk] = []
-    for doc_id, doc_chunks in doc_groups.items():
+    for _doc_id, doc_chunks in doc_groups.items():
         sorted_chunks = sorted(doc_chunks, key=lambda c: c.chunk_index)
 
         for _, run in groupby(
@@ -74,11 +74,13 @@ def _merge_adjacent_chunks(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]
             else:
                 combined_content = "\n\n".join(c.chunk_content for c in run_chunks)
                 best_score = max(c.similarity_score for c in run_chunks)
-                merged.append(replace(
-                    run_chunks[0],
-                    chunk_content=combined_content,
-                    similarity_score=best_score,
-                ))
+                merged.append(
+                    replace(
+                        run_chunks[0],
+                        chunk_content=combined_content,
+                        similarity_score=best_score,
+                    )
+                )
 
     return merged
 
@@ -112,8 +114,7 @@ def _drop_overlapping(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
 
         tokens = _token_set(chunk.chunk_content)
         is_duplicate = any(
-            _jaccard_similarity(tokens, existing) > _OVERLAP_THRESHOLD
-            for existing in kept_tokens
+            _jaccard_similarity(tokens, existing) > _OVERLAP_THRESHOLD for existing in kept_tokens
         )
         if not is_duplicate:
             kept.append(chunk)
@@ -178,10 +179,7 @@ def rrf_merge(
         max_rrf = 1.0
 
     sorted_keys = sorted(scores.keys(), key=lambda k: scores[k], reverse=True)
-    return [
-        replace(chunk_map[key], similarity_score=scores[key] / max_rrf)
-        for key in sorted_keys
-    ]
+    return [replace(chunk_map[key], similarity_score=scores[key] / max_rrf) for key in sorted_keys]
 
 
 class RetrievalService:

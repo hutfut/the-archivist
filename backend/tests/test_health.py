@@ -19,7 +19,8 @@ async def test_response_includes_request_id_header(client: AsyncClient) -> None:
 
 
 async def test_request_id_in_log_records(
-    client: AsyncClient, caplog: "pytest.LogCaptureFixture",  # noqa: F821
+    client: AsyncClient,
+    caplog: "pytest.LogCaptureFixture",  # noqa: F821
 ) -> None:
     """Endpoints that log should have the request_id attribute on their records."""
     with caplog.at_level(logging.INFO):

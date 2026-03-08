@@ -69,7 +69,9 @@ async def upload_document(
         max_mb = settings.max_upload_bytes / (1024 * 1024)
         logger.warning(
             "Rejected upload: %s is %d bytes (max %.0f MB)",
-            file.filename, len(content), max_mb,
+            file.filename,
+            len(content),
+            max_mb,
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -77,7 +79,11 @@ async def upload_document(
         )
 
     result = await document_service.save_document(
-        file.filename or "unnamed", content, session, settings, processor,
+        file.filename or "unnamed",
+        content,
+        session,
+        settings,
+        processor,
     )
     logger.info("Uploaded document %s (%s, %d bytes)", result.id, result.filename, result.file_size)
     return result
@@ -165,9 +171,7 @@ async def get_related_documents(
         )
 
     source_avg = (
-        select(func.avg(Chunk.embedding))
-        .where(Chunk.document_id == document_id)
-        .scalar_subquery()
+        select(func.avg(Chunk.embedding)).where(Chunk.document_id == document_id).scalar_subquery()
     )
 
     other_avg = (

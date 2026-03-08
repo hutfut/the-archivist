@@ -1,12 +1,11 @@
-from collections.abc import AsyncGenerator
+import os
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine
-from testcontainers.postgres import PostgresContainer
-
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.agent.graph import build_agent_graph
 from app.agent.llm import MockChatModel
@@ -22,21 +21,24 @@ from app.services.retrieval import RetrievalService
 
 
 @pytest.fixture(scope="session")
-def pg_container():
+def database_url() -> Generator[str, None, None]:
+    """Use DATABASE_URL env var (CI service container) or fall back to testcontainers."""
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        yield url
+        return
+
+    from testcontainers.postgres import PostgresContainer
+
     with PostgresContainer(
         image="pgvector/pgvector:pg17",
         username="test",
         password="test",
         dbname="test",
     ) as pg:
-        yield pg
-
-
-@pytest.fixture(scope="session")
-def database_url(pg_container: PostgresContainer) -> str:
-    host = pg_container.get_container_host_ip()
-    port = pg_container.get_exposed_port(5432)
-    return f"postgresql+asyncpg://test:test@{host}:{port}/test"
+        host = pg.get_container_host_ip()
+        port = pg.get_exposed_port(5432)
+        yield f"postgresql+asyncpg://test:test@{host}:{port}/test"
 
 
 @pytest.fixture

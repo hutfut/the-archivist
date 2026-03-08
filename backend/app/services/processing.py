@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -221,8 +221,8 @@ class PipelineProcessor:
         texts = [c.content for c in chunks_with_headings]
         embeddings = await asyncio.to_thread(self._embedding_service.embed_texts, texts)
 
-        now = datetime.now(timezone.utc)
-        for i, (cwh, embedding) in enumerate(zip(chunks_with_headings, embeddings)):
+        now = datetime.now(UTC)
+        for i, (cwh, embedding) in enumerate(zip(chunks_with_headings, embeddings, strict=True)):
             chunk = Chunk(
                 id=uuid.uuid4(),
                 document_id=doc_id,

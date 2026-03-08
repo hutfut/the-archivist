@@ -15,16 +15,12 @@ class Base(DeclarativeBase):
 class Document(Base):
     __tablename__ = "documents"
 
-    id: Mapped[_uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=_uuid.uuid4
-    )
+    id: Mapped[_uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid.uuid4)
     filename: Mapped[str] = mapped_column(String, nullable=False)
     content_type: Mapped[str] = mapped_column(String, nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class Chunk(Base):
@@ -34,9 +30,7 @@ class Chunk(Base):
         Index("ix_chunks_search_vector", "search_vector", postgresql_using="gin"),
     )
 
-    id: Mapped[_uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=_uuid.uuid4
-    )
+    id: Mapped[_uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid.uuid4)
     document_id: Mapped[_uuid.UUID] = mapped_column(
         Uuid, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
     )
@@ -45,35 +39,23 @@ class Chunk(Base):
     section_heading: Mapped[str | None] = mapped_column(String, nullable=True)
     embedding = mapped_column(Vector(384), nullable=False)
     search_vector = mapped_column(TSVECTOR, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class Conversation(Base):
     __tablename__ = "conversations"
 
-    id: Mapped[_uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=_uuid.uuid4
-    )
+    id: Mapped[_uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid.uuid4)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class Message(Base):
     __tablename__ = "messages"
-    __table_args__ = (
-        Index("ix_messages_conversation_id", "conversation_id"),
-    )
+    __table_args__ = (Index("ix_messages_conversation_id", "conversation_id"),)
 
-    id: Mapped[_uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=_uuid.uuid4
-    )
+    id: Mapped[_uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid.uuid4)
     conversation_id: Mapped[_uuid.UUID] = mapped_column(
         Uuid,
         ForeignKey("conversations.id", ondelete="CASCADE"),
@@ -82,6 +64,4 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     sources: Mapped[Any | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

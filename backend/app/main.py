@@ -50,7 +50,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_processor(embedding_service)
 
     retrieval_service = RetrievalService(
-        embedding_service, retrieval_mode=settings.retrieval_mode,
+        embedding_service,
+        retrieval_mode=settings.retrieval_mode,
     )
     init_search(retrieval_service)
 

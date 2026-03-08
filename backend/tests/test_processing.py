@@ -58,11 +58,7 @@ class TestMarkdownChunking:
         assert any(h and "Section B" in h for h in headings)
 
     def test_heading_hierarchy_concatenated(self):
-        md = (
-            "# Top\n\n"
-            "## Middle\n\n"
-            "### Deep\n\nDeep content here.\n"
-        )
+        md = "# Top\n\n## Middle\n\n### Deep\n\nDeep content here.\n"
         chunks = chunk_markdown(md)
         deep_chunks = [c for c in chunks if c.section_heading and "Deep" in c.section_heading]
         assert len(deep_chunks) >= 1

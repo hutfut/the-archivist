@@ -8,7 +8,6 @@ import json
 import uuid
 from pathlib import Path
 
-import pytest
 from httpx import AsyncClient
 
 NONEXISTENT_UUID = str(uuid.uuid4())
@@ -212,9 +211,9 @@ def _parse_sse_events(body: str) -> list[tuple[str, dict]]:
     current_event: str | None = None
     for line in body.splitlines():
         if line.startswith("event: "):
-            current_event = line[len("event: "):]
+            current_event = line[len("event: ") :]
         elif line.startswith("data: ") and current_event is not None:
-            data = json.loads(line[len("data: "):])
+            data = json.loads(line[len("data: ") :])
             events.append((current_event, data))
             current_event = None
     return events

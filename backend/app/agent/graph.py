@@ -10,8 +10,8 @@ from langgraph.graph.state import CompiledStateGraph
 
 from app.agent.llm import _CONTEXT_MARKER
 from app.services.retrieval import (
-    RetrievedChunk,
     RetrievalService,
+    RetrievedChunk,
     deduplicate_chunks,
 )
 
@@ -121,11 +121,7 @@ def _build_grade_node(similarity_threshold: float) -> Any:
                 chunk.similarity_score,
                 "PASS" if chunk.similarity_score >= similarity_threshold else "FAIL",
             )
-        relevant = [
-            chunk
-            for chunk in retrieved
-            if chunk.similarity_score >= similarity_threshold
-        ]
+        relevant = [chunk for chunk in retrieved if chunk.similarity_score >= similarity_threshold]
         logger.info(
             "Graded %d/%d chunks as relevant (threshold=%.2f, top_score=%.4f)",
             len(relevant),
@@ -154,9 +150,7 @@ def _build_generate_node(llm: BaseChatModel) -> Any:
                 source_label = f"{chunk.filename} > {chunk.section_heading}"
             else:
                 source_label = chunk.filename
-            context_parts.append(
-                f"[Source: {source_label}]\n{chunk.chunk_content}"
-            )
+            context_parts.append(f"[Source: {source_label}]\n{chunk.chunk_content}")
         context_text = "\n\n---\n\n".join(context_parts)
 
         messages = [SystemMessage(content=_SYSTEM_PROMPT)]
@@ -167,10 +161,7 @@ def _build_generate_node(llm: BaseChatModel) -> Any:
             else:
                 messages.append(AIMessage(content=msg["content"]))
 
-        prompt = (
-            f"Question: {state['query']}\n\n"
-            f"{_CONTEXT_MARKER}\n{context_text}"
-        )
+        prompt = f"Question: {state['query']}\n\n{_CONTEXT_MARKER}\n{context_text}"
         messages.append(HumanMessage(content=prompt))
 
         result = await llm.ainvoke(messages)

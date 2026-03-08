@@ -143,9 +143,7 @@ async def test_agent_returns_no_docs_when_store_empty(
         session_factory=session_factory,
     )
 
-    result = await graph.ainvoke(
-        {"query": "Anything?", "conversation_history": []}
-    )
+    result = await graph.ainvoke({"query": "Anything?", "conversation_history": []})
 
     assert result["response"] == _NO_RELEVANT_DOCS_RESPONSE
     assert result["sources"] == []
@@ -169,9 +167,7 @@ async def test_grade_node_filters_below_threshold(
         similarity_threshold=0.3,
     )
 
-    result = await graph.ainvoke(
-        {"query": "test", "conversation_history": []}
-    )
+    result = await graph.ainvoke({"query": "test", "conversation_history": []})
 
     assert len(result["sources"]) == 2
     scores = [s["similarity_score"] for s in result["sources"]]
@@ -196,9 +192,7 @@ async def test_conversation_history_included_in_llm_prompt(
         {"role": "assistant", "content": "France is a country in Europe."},
     ]
 
-    result = await graph.ainvoke(
-        {"query": "What is its capital?", "conversation_history": history}
-    )
+    result = await graph.ainvoke({"query": "What is its capital?", "conversation_history": history})
 
     assert result["response"]
     assert len(result["sources"]) > 0
@@ -216,9 +210,7 @@ async def test_source_attributions_structure(
         session_factory=session_factory,
     )
 
-    result = await graph.ainvoke(
-        {"query": "test", "conversation_history": []}
-    )
+    result = await graph.ainvoke({"query": "test", "conversation_history": []})
 
     for source in result["sources"]:
         assert "document_id" in source

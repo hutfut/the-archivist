@@ -1,4 +1,5 @@
 """Tests for document content, search, and related documents endpoints."""
+
 import uuid
 
 from httpx import AsyncClient
@@ -40,10 +41,16 @@ async def test_content_404_for_missing_document(client: AsyncClient) -> None:
 
 
 async def test_content_404_for_missing_file_on_disk(
-    client: AsyncClient, test_settings: "Settings",  # noqa: F821
+    client: AsyncClient,
+    test_settings: "Settings",  # noqa: F821
 ) -> None:
-    doc = await _upload(client, "temp.txt", b"This is a temporary document for testing disk removal.")
+    doc = await _upload(
+        client,
+        "temp.txt",
+        b"This is a temporary document for testing disk removal.",
+    )
     import shutil
+
     doc_dir = test_settings.upload_dir / doc["id"]
     shutil.rmtree(doc_dir)
     resp = await client.get(f"/api/documents/{doc['id']}/content")
@@ -54,7 +61,11 @@ async def test_content_404_for_missing_file_on_disk(
 
 
 async def test_search_returns_results(client: AsyncClient) -> None:
-    await _upload(client, "python.txt", b"Python is a programming language used for web development and data science.")
+    await _upload(
+        client,
+        "python.txt",
+        b"Python is a programming language used for web development and data science.",
+    )
     resp = await client.get("/api/search", params={"q": "python programming"})
     assert resp.status_code == 200
     body = resp.json()

@@ -36,10 +36,7 @@ class MockChatModel(BaseChatModel):
 
         if _CONTEXT_MARKER in content:
             context_section = content.split(_CONTEXT_MARKER, 1)[1].strip()
-            return (
-                f"Based on your documents, here is what I found:\n\n"
-                f"{context_section}"
-            )
+            return f"Based on your documents, here is what I found:\n\n{context_section}"
         return _NO_CONTEXT_RESPONSE
 
     def _generate(

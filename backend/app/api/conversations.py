@@ -66,7 +66,9 @@ async def list_conversations(
     session: AsyncSession = Depends(get_session),
 ) -> ConversationListResponse:
     conversations, total = await conversation_service.list_conversations(
-        session, limit=limit, offset=offset,
+        session,
+        limit=limit,
+        offset=offset,
     )
     return ConversationListResponse(conversations=conversations, total=total)
 
@@ -79,9 +81,7 @@ async def get_conversation(
     conversation_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetailResponse:
-    detail = await conversation_service.get_conversation_with_messages(
-        conversation_id, session
-    )
+    detail = await conversation_service.get_conversation_with_messages(conversation_id, session)
     if detail is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -98,9 +98,7 @@ async def delete_conversation(
     conversation_id: UUID,
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    deleted = await conversation_service.delete_conversation(
-        conversation_id, session
-    )
+    deleted = await conversation_service.delete_conversation(conversation_id, session)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -121,16 +119,16 @@ async def send_message(
     settings: Settings = Depends(get_settings),
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> MessageResponse:
-    conversation = await conversation_service.get_conversation(
-        conversation_id, session
-    )
+    conversation = await conversation_service.get_conversation(conversation_id, session)
     if conversation is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found",
         )
 
-    logger.info("Message received for conversation %s (%d chars)", conversation_id, len(request.content))
+    logger.info(
+        "Message received for conversation %s (%d chars)", conversation_id, len(request.content)
+    )
 
     try:
         return await conversation_service.run_agent_turn(
@@ -144,7 +142,7 @@ async def send_message(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The AI agent failed to generate a response. Please try again.",
-        )
+        ) from None
 
 
 def _sse_event(event: str, data: dict[str, Any]) -> str:
@@ -186,9 +184,7 @@ async def _stream_response(
     session_factory = get_session_factory()
 
     async with session_factory() as session:
-        conversation = await conversation_service.get_conversation(
-            conversation_id, session
-        )
+        conversation = await conversation_service.get_conversation(conversation_id, session)
         if conversation is None:
             logger.warning("Stream aborted: conversation %s not found", conversation_id)
             yield _sse_event("error", {"detail": "Conversation not found"})
@@ -208,19 +204,28 @@ async def _stream_response(
 
     msg_id = str(assistant_message.id)
 
-    yield _sse_event("message_start", {
-        "message_id": msg_id,
-        "conversation_id": str(assistant_message.conversation_id),
-    })
+    yield _sse_event(
+        "message_start",
+        {
+            "message_id": msg_id,
+            "conversation_id": str(assistant_message.conversation_id),
+        },
+    )
 
     for chunk in _chunk_text(assistant_message.content):
         yield _sse_event("content_delta", {"delta": chunk})
         await asyncio.sleep(0.02)
 
-    sources = [s.model_dump(mode="json") for s in assistant_message.sources] if assistant_message.sources else []
+    sources = (
+        [s.model_dump(mode="json") for s in assistant_message.sources]
+        if assistant_message.sources
+        else []
+    )
     yield _sse_event("sources", {"sources": sources})
     yield _sse_event("message_end", {"message_id": msg_id})
-    logger.info("Stream completed for conversation %s (message %s)", conversation_id, assistant_message.id)
+    logger.info(
+        "Stream completed for conversation %s (message %s)", conversation_id, assistant_message.id
+    )
 
 
 @router.post("/conversations/{conversation_id}/messages/stream")

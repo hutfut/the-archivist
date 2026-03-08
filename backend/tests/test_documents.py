@@ -39,7 +39,8 @@ async def test_upload_returns_correct_metadata(client: AsyncClient) -> None:
 
 
 async def test_upload_stores_file_on_disk(
-    client: AsyncClient, test_settings: "Settings"  # noqa: F821
+    client: AsyncClient,
+    test_settings: "Settings",  # noqa: F821
 ) -> None:
     response = await client.post(
         "/api/documents",
@@ -133,7 +134,8 @@ async def test_delete_document_success(client: AsyncClient) -> None:
 
 
 async def test_delete_removes_file_from_disk(
-    client: AsyncClient, test_settings: "Settings"  # noqa: F821
+    client: AsyncClient,
+    test_settings: "Settings",  # noqa: F821
 ) -> None:
     upload = await client.post(
         "/api/documents",
@@ -181,7 +183,8 @@ async def test_delete_cascades_to_chunks(client: AsyncClient) -> None:
 
 
 async def test_upload_file_exceeding_max_size_rejected(
-    client: AsyncClient, test_settings: "Settings"  # noqa: F821
+    client: AsyncClient,
+    test_settings: "Settings",  # noqa: F821
 ) -> None:
     """Uploads larger than max_upload_bytes should return 400."""
     oversized = b"x" * (test_settings.max_upload_bytes + 1)
@@ -226,7 +229,8 @@ async def test_list_documents_pagination(client: AsyncClient) -> None:
 
 
 async def test_delete_document_files_already_removed(
-    client: AsyncClient, test_settings: "Settings"  # noqa: F821
+    client: AsyncClient,
+    test_settings: "Settings",  # noqa: F821
 ) -> None:
     """Deleting a document whose files are already gone should still return 204."""
     upload = await client.post(

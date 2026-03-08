@@ -42,7 +42,12 @@ def _extract_pdf(file_path: Path) -> str:
     reader = PdfReader(file_path)
     pages = [page.extract_text() or "" for page in reader.pages]
     text = "\n".join(pages).strip()
-    logger.info("Extracted %d characters from %d-page PDF %s", len(text), len(reader.pages), file_path.name)
+    logger.info(
+        "Extracted %d characters from %d-page PDF %s",
+        len(text),
+        len(reader.pages),
+        file_path.name,
+    )
     return text
 
 

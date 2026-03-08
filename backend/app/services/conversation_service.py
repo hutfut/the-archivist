@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
@@ -28,7 +28,7 @@ class AgentError(Exception):
 
 
 async def create_conversation(session: AsyncSession) -> ConversationResponse:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     conversation = Conversation(
         id=uuid.uuid4(),
         title=None,
@@ -47,12 +47,7 @@ async def list_conversations(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[ConversationResponse], int]:
-    stmt = (
-        select(Conversation)
-        .order_by(Conversation.updated_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
+    stmt = select(Conversation).order_by(Conversation.updated_at.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     rows = result.scalars().all()
 
@@ -65,9 +60,7 @@ async def list_conversations(
 async def get_conversation(
     conversation_id: uuid.UUID, session: AsyncSession
 ) -> Conversation | None:
-    result = await session.execute(
-        select(Conversation).where(Conversation.id == conversation_id)
-    )
+    result = await session.execute(select(Conversation).where(Conversation.id == conversation_id))
     return result.scalar_one_or_none()
 
 
@@ -94,9 +87,7 @@ async def get_conversation_with_messages(
     )
 
 
-async def delete_conversation(
-    conversation_id: uuid.UUID, session: AsyncSession
-) -> bool:
+async def delete_conversation(conversation_id: uuid.UUID, session: AsyncSession) -> bool:
     conversation = await get_conversation(conversation_id, session)
     if conversation is None:
         return False
@@ -115,7 +106,7 @@ async def add_message(
     sources: list[dict[str, Any]] | None = None,
     commit: bool = True,
 ) -> MessageResponse:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     message = Message(
         id=uuid.uuid4(),
         conversation_id=conversation_id,
@@ -140,7 +131,9 @@ async def add_message(
 
 
 async def set_conversation_title(
-    conversation_id: uuid.UUID, title: str, session: AsyncSession,
+    conversation_id: uuid.UUID,
+    title: str,
+    session: AsyncSession,
     commit: bool = True,
 ) -> None:
     conversation = await get_conversation(conversation_id, session)
@@ -195,18 +188,22 @@ async def run_agent_turn(
     )
 
     history = await get_conversation_history(
-        conversation_id, session, max_messages=max_history_messages,
+        conversation_id,
+        session,
+        max_messages=max_history_messages,
     )
 
     try:
-        agent_result = await agent.ainvoke({
-            "query": content,
-            "conversation_history": history,
-        })
+        agent_result = await agent.ainvoke(
+            {
+                "query": content,
+                "conversation_history": history,
+            }
+        )
     except Exception:
         logger.exception("Agent failed for conversation %s", conversation_id)
         await session.rollback()
-        raise AgentError("The AI agent failed to generate a response.")
+        raise AgentError("The AI agent failed to generate a response.") from None
 
     assistant_message = await add_message(
         conversation_id=conversation_id,
@@ -218,7 +215,10 @@ async def run_agent_turn(
     )
 
     await set_conversation_title(
-        conversation_id, content, session, commit=False,
+        conversation_id,
+        content,
+        session,
+        commit=False,
     )
 
     await session.commit()

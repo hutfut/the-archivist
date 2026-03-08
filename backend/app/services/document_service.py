@@ -1,7 +1,7 @@
 import logging
 import shutil
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 
 from sqlalchemy import func, select
@@ -38,7 +38,7 @@ async def save_document(
 
     file_path.write_bytes(content)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     doc = Document(
         id=doc_id,
         filename=filename,
@@ -51,7 +51,11 @@ async def save_document(
     await session.flush()
 
     chunk_count = await processor.process(
-        doc_id, file_path, content_type, session, filename=filename,
+        doc_id,
+        file_path,
+        content_type,
+        session,
+        filename=filename,
     )
     doc.chunk_count = chunk_count
 
@@ -60,7 +64,10 @@ async def save_document(
 
     logger.info(
         "Saved document %s (%s, %d bytes, %d chunks)",
-        doc_id, filename, len(content), chunk_count,
+        doc_id,
+        filename,
+        len(content),
+        chunk_count,
     )
     return DocumentResponse.model_validate(doc)
 
@@ -71,12 +78,7 @@ async def list_documents(
     offset: int = 0,
 ) -> tuple[list[DocumentResponse], int]:
     """Return documents ordered by creation time (newest first) and total count."""
-    stmt = (
-        select(Document)
-        .order_by(Document.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
+    stmt = select(Document).order_by(Document.created_at.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     rows = result.scalars().all()
 
@@ -86,13 +88,9 @@ async def list_documents(
     return [DocumentResponse.model_validate(row) for row in rows], total
 
 
-async def get_document(
-    document_id: uuid.UUID, session: AsyncSession
-) -> Document | None:
+async def get_document(document_id: uuid.UUID, session: AsyncSession) -> Document | None:
     """Fetch a single document by ID, or None if not found."""
-    result = await session.execute(
-        select(Document).where(Document.id == document_id)
-    )
+    result = await session.execute(select(Document).where(Document.id == document_id))
     return result.scalar_one_or_none()
 
 
