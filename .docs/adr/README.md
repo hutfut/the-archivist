@@ -44,5 +44,7 @@ Trade-offs accepted, follow-on work, risks.
 | 0004 | [LangGraph Agent Architecture](0004-langgraph-agent-architecture.md) | 2026-03-06 |
 | 0005 | [RAG Retrieval Quality Improvements](0005-rag-retrieval-improvements.md) | 2026-03-07 |
 | 0006 | [Hybrid Search and Retrieval Quality](0006-hybrid-search-and-retrieval-quality.md) | 2026-03-07 |
+| 0007 | [Frontend Routing and Page Architecture](0007-frontend-routing-and-page-architecture.md) | 2026-03-08 |
+| 0008 | [PoE2 Design System Approach](0008-poe2-design-system-approach.md) | 2026-03-08 |
 
 When you add an ADR, append a row to this table.
