@@ -12,6 +12,7 @@ import {
 import { useLayoutContext } from "../hooks/useLayoutContext";
 import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import { filenameToTitle, fromSlug, toSlug, formatFileSize, formatDate, fileTypeBadge } from "../lib/utils";
+import { extractHeadings, extractText, type Heading } from "../lib/markdown";
 
 export function DocumentPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -149,28 +150,6 @@ function DocumentView({ documentId }: { documentId: string }) {
   );
 }
 
-interface Heading {
-  level: number;
-  text: string;
-  id: string;
-}
-
-function extractHeadings(markdown: string): Heading[] {
-  const headings: Heading[] = [];
-  for (const line of markdown.split("\n")) {
-    const match = line.match(/^(#{2,3})\s+(.+)/);
-    if (match) {
-      const text = match[2].replace(/[*_`[\]]/g, "").trim();
-      const id = text
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-      headings.push({ level: match[1].length, text, id });
-    }
-  }
-  return headings;
-}
-
 function TableOfContents({ headings }: { headings: Heading[] }) {
   const [activeId, setActiveId] = useState<string>("");
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -285,17 +264,6 @@ function MarkdownRenderer({ content }: { content: string }) {
       </Markdown>
     </div>
   );
-}
-
-function extractText(children: React.ReactNode): string {
-  if (typeof children === "string") return children;
-  if (typeof children === "number") return String(children);
-  if (Array.isArray(children)) return children.map(extractText).join("");
-  if (children && typeof children === "object" && "props" in children) {
-    const el = children as { props: { children?: React.ReactNode } };
-    return extractText(el.props.children);
-  }
-  return "";
 }
 
 function RelatedPanel({ documents }: { documents: RelatedDocument[] }) {
