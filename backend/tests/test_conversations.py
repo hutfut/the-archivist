@@ -6,7 +6,10 @@ routing -> service -> agent -> database.
 
 import json
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import AsyncClient
 
@@ -395,3 +398,79 @@ async def test_delete_document_invalid_uuid_returns_422(
     assert resp.status_code == 422
     detail = resp.json()["detail"]
     assert "not a valid id" in detail.lower()
+
+
+async def test_stream_real_filters_rewrite_node_tokens() -> None:
+    """Tokens from the rewrite_query node must not leak into streamed content."""
+    from app.api.conversations import _stream_response_real
+
+    conv_id = uuid.uuid4()
+    msg_id = uuid.uuid4()
+
+    fake_message = SimpleNamespace(
+        id=msg_id,
+        conversation_id=conv_id,
+        content="The actual answer.",
+        sources=[],
+    )
+
+    async def fake_astream_events(inp, *, version):
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "rewrite_query"},
+            "data": {"chunk": SimpleNamespace(content="leaked rewrite text")},
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "generate_response"},
+            "data": {"chunk": SimpleNamespace(content="The actual ")},
+        }
+        yield {
+            "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "generate_response"},
+            "data": {"chunk": SimpleNamespace(content="answer.")},
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "generate_response",
+            "data": {"output": {"sources": []}},
+        }
+
+    mock_agent = MagicMock()
+    mock_agent.astream_events = fake_astream_events
+
+    mock_session = AsyncMock()
+    mock_session.commit = AsyncMock()
+
+    mock_conversation = SimpleNamespace(id=conv_id, title=None)
+
+    with (
+        patch(
+            "app.api.conversations.get_session_factory",
+            return_value=MagicMock(
+                __call__=MagicMock(
+                    return_value=MagicMock(
+                        __aenter__=AsyncMock(return_value=mock_session),
+                        __aexit__=AsyncMock(return_value=False),
+                    )
+                )
+            ),
+        ),
+        patch(
+            "app.api.conversations.conversation_service"
+        ) as mock_conv_service,
+    ):
+        mock_conv_service.get_conversation = AsyncMock(return_value=mock_conversation)
+        mock_conv_service.add_message = AsyncMock(return_value=fake_message)
+        mock_conv_service.get_conversation_history = AsyncMock(return_value=[])
+        mock_conv_service.set_conversation_title = AsyncMock()
+
+        events: list[tuple[str, dict]] = []
+        async for raw_event in _stream_response_real(conv_id, "test query", mock_agent, 10):
+            events.extend(_parse_sse_events(raw_event))
+
+    deltas = [e[1]["delta"] for e in events if e[0] == "content_delta"]
+    full_content = "".join(deltas)
+
+    assert "leaked rewrite text" not in full_content
+    assert full_content == "The actual answer."

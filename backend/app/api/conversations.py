@@ -256,6 +256,9 @@ async def _stream_response_real(
                 kind = event.get("event", "")
 
                 if kind == "on_chat_model_stream":
+                    node = event.get("metadata", {}).get("langgraph_node")
+                    if node != "generate_response":
+                        continue
                     chunk = event.get("data", {}).get("chunk")
                     if chunk is not None:
                         token = str(chunk.content) if hasattr(chunk, "content") else ""
