@@ -36,7 +36,11 @@ _SYSTEM_PROMPT = (
     "- Cite specific sources when possible, referring to documents by name.\n"
     "- If the context does not contain enough information, say so honestly "
     "rather than speculating.\n"
-    "- Be precise and thorough, but accessible. Avoid unnecessary jargon.\n"
+    "- Match your level of detail to the question. For broad or high-level "
+    "questions, give a concise overview. For specific questions, provide "
+    "focused, detailed answers. Avoid exhaustively listing every detail "
+    "from the sources when a summary would better serve the seeker.\n"
+    "- Be accessible. Avoid unnecessary jargon.\n"
     "- When multiple sources address a topic, synthesize them and note where "
     "they agree or differ."
 )
