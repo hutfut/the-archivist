@@ -209,7 +209,7 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
         </div>
 
         <h1 className="font-heading text-2xl font-semibold text-[var(--color-accent-gold)] mb-3">
-          Welcome to Exile's Archive
+          Welcome to The Archive
         </h1>
         <p className="text-[var(--color-text-secondary)] mb-8 leading-relaxed">
           Upload your documents to get started. Ask questions, search content,
