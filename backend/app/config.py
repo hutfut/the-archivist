@@ -32,6 +32,12 @@ class Settings:
     ollama_base_url: str = field(
         default_factory=lambda: os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     )
+    anthropic_api_key: str = field(
+        default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", "")
+    )
+    anthropic_model: str = field(
+        default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+    )
     similarity_threshold: float = field(
         default_factory=lambda: float(os.environ.get("SIMILARITY_THRESHOLD", "0.3"))
     )

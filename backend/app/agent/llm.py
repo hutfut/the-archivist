@@ -81,5 +81,20 @@ def create_llm(settings: Settings) -> BaseChatModel:
             base_url=settings.ollama_base_url,
         )
 
-    logger.info("Using mock LLM (set LLM_PROVIDER=ollama for real responses)")
+    if settings.llm_provider == "anthropic":
+        if not settings.anthropic_api_key:
+            raise ValueError(
+                "ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic. "
+                "Set the environment variable or switch to LLM_PROVIDER=mock."
+            )
+        from langchain_anthropic import ChatAnthropic
+
+        logger.info("Using Anthropic LLM: model=%s", settings.anthropic_model)
+        return ChatAnthropic(
+            model=settings.anthropic_model,
+            api_key=settings.anthropic_api_key,
+            streaming=True,
+        )
+
+    logger.info("Using mock LLM (set LLM_PROVIDER=ollama or anthropic for real responses)")
     return MockChatModel()

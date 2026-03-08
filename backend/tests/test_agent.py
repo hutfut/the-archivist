@@ -6,12 +6,13 @@ are in test_conversations.py.
 """
 
 from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agent.graph import _NO_RELEVANT_DOCS_RESPONSE, build_agent_graph
-from app.agent.llm import MockChatModel
+from app.agent.graph import _NO_RELEVANT_DOCS_RESPONSE, _SYSTEM_PROMPT, build_agent_graph
+from app.agent.llm import MockChatModel, create_llm
+from app.config import Settings
 from app.services.retrieval import RetrievedChunk
 
 
@@ -258,3 +259,33 @@ async def test_graph_has_four_nodes(mock_llm: MockChatModel) -> None:
         "grade_relevance",
         "generate_response",
     }
+
+
+def test_create_llm_returns_mock_by_default() -> None:
+    settings = Settings(llm_provider="mock")
+    llm = create_llm(settings)
+    assert isinstance(llm, MockChatModel)
+
+
+def test_create_llm_returns_anthropic_when_configured() -> None:
+    from langchain_anthropic import ChatAnthropic
+
+    settings = Settings(
+        llm_provider="anthropic",
+        anthropic_api_key="test-key",
+        anthropic_model="claude-sonnet-4-20250514",
+    )
+    llm = create_llm(settings)
+    assert isinstance(llm, ChatAnthropic)
+
+
+def test_create_llm_raises_on_missing_anthropic_api_key() -> None:
+    settings = Settings(llm_provider="anthropic", anthropic_api_key="")
+    with pytest.raises(ValueError, match="ANTHROPIC_API_KEY is required"):
+        create_llm(settings)
+
+
+def test_system_prompt_contains_caretaker_persona() -> None:
+    assert "The Caretaker" in _SYSTEM_PROMPT
+    assert "The Archive" in _SYSTEM_PROMPT
+    assert "ONLY the provided document context" in _SYSTEM_PROMPT
