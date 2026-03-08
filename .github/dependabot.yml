@@ -13,3 +13,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(deps):"
+    groups:
+      eslint:
+        patterns:
+          - "eslint*"
+          - "@eslint/*"
+          - "typescript-eslint"
