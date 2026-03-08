@@ -6,7 +6,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
@@ -80,8 +82,46 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 
+FIELD_LABELS: dict[str, str] = {
+    "content": "Message content",
+    "file": "File",
+}
+
+
+def _format_validation_error(exc: RequestValidationError) -> str:
+    """Translate Pydantic validation errors into plain-English messages."""
+    messages: list[str] = []
+    for err in exc.errors():
+        loc = err.get("loc", ())
+        field = str(loc[-1]) if loc else "input"
+        label = FIELD_LABELS.get(field, field.replace("_", " ").capitalize())
+        err_type = err.get("type", "")
+        if err_type == "missing":
+            messages.append(f"{label} is required.")
+        elif err_type == "string_too_short":
+            messages.append(f"{label} must not be empty.")
+        elif err_type == "string_too_long":
+            ctx = err.get("ctx", {})
+            max_length = ctx.get("max_length", "?")
+            messages.append(f"{label} must be at most {max_length} characters.")
+        elif err_type == "uuid_parsing":
+            messages.append(f"'{field}' is not a valid ID.")
+        else:
+            messages.append(err.get("msg", "Validation error."))
+    return " ".join(messages) if messages else "Invalid request."
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="NotebookLM", version="0.1.0", lifespan=lifespan)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(
+        _request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={"detail": _format_validation_error(exc)},
+        )
 
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(

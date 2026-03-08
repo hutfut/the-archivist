@@ -134,6 +134,22 @@ async def test_send_message_empty_content_returns_422(
         json={"content": ""},
     )
     assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert "must not be empty" in detail.lower() or "content" in detail.lower()
+
+
+async def test_send_message_missing_content_returns_422(
+    client: AsyncClient,
+) -> None:
+    conv = await _create_conversation(client)
+
+    resp = await client.post(
+        f"/api/conversations/{conv['id']}/messages",
+        json={},
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert "required" in detail.lower()
 
 
 async def test_send_message_nonexistent_conversation(
@@ -161,6 +177,27 @@ async def test_conversation_title_auto_generated(
     assert resp.status_code == 200
     data = resp.json()
     assert data["title"] == "What is the capital of France?"
+
+
+async def test_conversation_title_not_overwritten_on_second_message(
+    client: AsyncClient,
+) -> None:
+    """Auto-title sets on the first message but does not overwrite on subsequent messages."""
+    conv = await _create_conversation(client)
+
+    await client.post(
+        f"/api/conversations/{conv['id']}/messages",
+        json={"content": "First question about France"},
+    )
+    resp = await client.get(f"/api/conversations/{conv['id']}")
+    assert resp.json()["title"] == "First question about France"
+
+    await client.post(
+        f"/api/conversations/{conv['id']}/messages",
+        json={"content": "Second question about Germany"},
+    )
+    resp = await client.get(f"/api/conversations/{conv['id']}")
+    assert resp.json()["title"] == "First question about France"
 
 
 async def test_messages_ordered_by_created_at(client: AsyncClient) -> None:
@@ -347,6 +384,8 @@ async def test_send_message_invalid_uuid_returns_422(
         json={"content": "Hello"},
     )
     assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert "not a valid id" in detail.lower()
 
 
 async def test_delete_document_invalid_uuid_returns_422(
@@ -354,3 +393,5 @@ async def test_delete_document_invalid_uuid_returns_422(
 ) -> None:
     resp = await client.delete("/api/documents/not-a-uuid")
     assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert "not a valid id" in detail.lower()
