@@ -9,7 +9,6 @@ import {
   fetchDocumentContent,
   fetchRelatedDocuments,
 } from "../api/content";
-import { useLayoutContext } from "../hooks/useLayoutContext";
 import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import { filenameToTitle, fromSlug, toSlug, formatFileSize, formatDate, fileTypeBadge } from "../lib/utils";
 import { extractHeadings, extractText, type Heading } from "../lib/markdown";
@@ -36,7 +35,6 @@ type PageState =
   | { status: "ready"; doc: DocumentContent; related: RelatedDocument[] };
 
 function DocumentView({ documentId }: { documentId: string }) {
-  const { openChat } = useLayoutContext();
   const { addItem } = useRecentlyViewed();
   const [state, setState] = useState<PageState>({ status: "loading" });
 
@@ -124,19 +122,6 @@ function DocumentView({ documentId }: { documentId: string }) {
                 {doc.content}
               </pre>
             )}
-          </div>
-
-          <div className="mt-4 flex justify-center">
-            <button
-              type="button"
-              onClick={() => openChat(`Tell me about ${title}`)}
-              className="poe-btn-secondary text-sm flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 20.25V4.125C3.75 3.504 4.254 3 4.875 3h14.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125H7.875L3.75 20.25z" />
-              </svg>
-              Ask about this document
-            </button>
           </div>
         </article>
 
