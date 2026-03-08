@@ -55,15 +55,29 @@ describe("fetchDocuments", () => {
     vi.stubGlobal("fetch", vi.fn());
   });
 
-  it("returns parsed document list on success", async () => {
-    const payload = { documents: [{ id: "1", filename: "test.md" }] };
+  it("passes limit and offset as query params", async () => {
+    const payload = { documents: [{ id: "1", filename: "test.md" }], total: 1 };
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify(payload), { status: 200 }),
     );
 
-    const result = await fetchDocuments();
+    const result = await fetchDocuments(24, 0);
     expect(result).toEqual(payload);
-    expect(fetch).toHaveBeenCalledWith("/api/documents");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const url = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(url).toContain("limit=24");
+    expect(url).toContain("offset=0");
+  });
+
+  it("passes non-zero offset for later pages", async () => {
+    const payload = { documents: [{ id: "2", filename: "b.md" }], total: 50 };
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(payload), { status: 200 }),
+    );
+
+    await fetchDocuments(24, 24);
+    const url = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(url).toContain("offset=24");
   });
 
   it("throws ApiError on failure", async () => {
@@ -74,7 +88,7 @@ describe("fetchDocuments", () => {
       }),
     );
 
-    await expect(fetchDocuments()).rejects.toThrow(ApiError);
+    await expect(fetchDocuments(24, 0)).rejects.toThrow(ApiError);
   });
 });
 

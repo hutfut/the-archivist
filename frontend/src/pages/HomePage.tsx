@@ -9,7 +9,7 @@ type SortKey = "newest" | "alpha" | "chunks";
 
 export function HomePage() {
   const { documents: docs, openUpload } = useLayoutContext();
-  const { documents, loading, remove } = docs;
+  const { documents, total, page, totalPages, setPage, loading, remove } = docs;
   const { items: recentlyViewed } = useRecentlyViewed();
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -44,11 +44,11 @@ export function HomePage() {
     return sorted;
   }, [documents, filter, sort]);
 
-  if (loading) {
+  if (loading && documents.length === 0) {
     return <LoadingSkeleton />;
   }
 
-  if (documents.length === 0) {
+  if (total === 0 && !loading) {
     return <EmptyState onUpload={openUpload} />;
   }
 
@@ -59,7 +59,7 @@ export function HomePage() {
           Your Library
         </h1>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          {documents.length} document{documents.length !== 1 ? "s" : ""} uploaded
+          {total} document{total !== 1 ? "s" : ""} uploaded
         </p>
       </div>
 
@@ -109,7 +109,7 @@ export function HomePage() {
 
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-[var(--color-text-muted)]">
-          <p className="text-sm">No documents match "{filter}"</p>
+          <p className="text-sm">No documents match &ldquo;{filter}&rdquo;</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -117,6 +117,10 @@ export function HomePage() {
             <DocumentCard key={doc.id} document={doc} onDelete={remove} />
           ))}
         </div>
+      )}
+
+      {totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       )}
     </div>
   );
@@ -223,6 +227,40 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) {
+  return (
+    <nav className="flex items-center justify-center gap-3 pt-8 pb-2" aria-label="Pagination">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+        className="poe-btn-secondary text-xs px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        &larr; Prev
+      </button>
+      <span className="text-xs text-[var(--color-text-secondary)]">
+        Page {page} of {totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onPageChange(page + 1)}
+        className="poe-btn-secondary text-xs px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Next &rarr;
+      </button>
+    </nav>
   );
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useDocuments } from "../useDocuments";
+import { useDocuments, PAGE_SIZE } from "../useDocuments";
 import * as documentsApi from "../../api/documents";
 import { ApiError } from "../../api/errors";
 
@@ -19,15 +19,15 @@ const mockUploadDocument = vi.mocked(documentsApi.uploadDocument);
 const mockDeleteDocument = vi.mocked(documentsApi.deleteDocument);
 
 beforeEach(() => {
-  mockFetchDocuments.mockResolvedValue({ documents: [] });
+  mockFetchDocuments.mockResolvedValue({ documents: [], total: 0 });
 });
 
 describe("useDocuments", () => {
-  it("loads documents on mount", async () => {
+  it("loads documents on mount with correct pagination params", async () => {
     const docs = [
       { id: "1", filename: "a.md", content_type: "text/markdown", file_size: 100, chunk_count: 1, created_at: "" },
     ];
-    mockFetchDocuments.mockResolvedValue({ documents: docs });
+    mockFetchDocuments.mockResolvedValue({ documents: docs, total: 1 });
 
     const { result } = renderHook(() => useDocuments());
 
@@ -35,8 +35,20 @@ describe("useDocuments", () => {
       expect(result.current.loading).toBe(false);
     });
 
+    expect(mockFetchDocuments).toHaveBeenCalledWith(PAGE_SIZE, 0);
     expect(result.current.documents).toEqual(docs);
+    expect(result.current.total).toBe(1);
+    expect(result.current.page).toBe(1);
     expect(result.current.error).toBeNull();
+  });
+
+  it("computes totalPages from total count", async () => {
+    mockFetchDocuments.mockResolvedValue({ documents: [], total: 50 });
+
+    const { result } = renderHook(() => useDocuments());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.totalPages).toBe(Math.ceil(50 / PAGE_SIZE));
   });
 
   it("sets error when fetch fails", async () => {
@@ -78,9 +90,10 @@ describe("useDocuments", () => {
     expect(result.current.error).toBe("File is empty");
   });
 
-  it("upload success prepends document to list", async () => {
+  it("upload success re-fetches page 1", async () => {
     const newDoc = { id: "2", filename: "new.md", content_type: "text/markdown", file_size: 50, chunk_count: 1, created_at: "" };
     mockUploadDocument.mockResolvedValue(newDoc);
+    mockFetchDocuments.mockResolvedValue({ documents: [newDoc], total: 1 });
 
     const { result } = renderHook(() => useDocuments());
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -91,7 +104,7 @@ describe("useDocuments", () => {
       await result.current.upload(file);
     });
 
-    expect(result.current.documents[0]).toEqual(newDoc);
+    expect(result.current.documents).toEqual([newDoc]);
     expect(result.current.uploading).toBe(false);
   });
 
@@ -110,23 +123,26 @@ describe("useDocuments", () => {
     expect(result.current.error).toBe("Too large");
   });
 
-  it("remove deletes and filters from list", async () => {
+  it("remove deletes and re-fetches current page", async () => {
     const docs = [
       { id: "1", filename: "a.md", content_type: "text/markdown", file_size: 100, chunk_count: 1, created_at: "" },
       { id: "2", filename: "b.md", content_type: "text/markdown", file_size: 200, chunk_count: 2, created_at: "" },
     ];
-    mockFetchDocuments.mockResolvedValue({ documents: docs });
+    mockFetchDocuments.mockResolvedValue({ documents: docs, total: 2 });
     mockDeleteDocument.mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useDocuments());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
+    const remaining = [docs[1]];
+    mockFetchDocuments.mockResolvedValue({ documents: remaining, total: 1 });
+
     await act(async () => {
       await result.current.remove("1");
     });
 
-    expect(result.current.documents).toHaveLength(1);
-    expect(result.current.documents[0].id).toBe("2");
+    expect(mockDeleteDocument).toHaveBeenCalledWith("1");
+    expect(result.current.documents).toEqual(remaining);
   });
 
   it("remove error sets error state", async () => {

@@ -8,8 +8,14 @@ import {
 } from "../api/documents.ts";
 import { ApiError } from "../api/errors.ts";
 
-interface UseDocumentsReturn {
+export const PAGE_SIZE = 24;
+
+export interface UseDocumentsReturn {
   documents: DocumentResponse[];
+  total: number;
+  page: number;
+  totalPages: number;
+  setPage: (page: number) => void;
   loading: boolean;
   error: string | null;
   uploading: boolean;
@@ -20,15 +26,26 @@ interface UseDocumentsReturn {
 
 export function useDocuments(): UseDocumentsReturn {
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPageRaw] = useState(1);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDocuments = useCallback(async () => {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const setPage = useCallback(
+    (p: number) => setPageRaw(Math.max(1, Math.min(p, totalPages))),
+    [totalPages],
+  );
+
+  const loadDocuments = useCallback(async (p: number) => {
     try {
       setLoading(true);
-      const data = await fetchDocuments();
+      const offset = (p - 1) * PAGE_SIZE;
+      const data = await fetchDocuments(PAGE_SIZE, offset);
       setDocuments(data.documents);
+      setTotal(data.total);
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load documents");
@@ -38,8 +55,8 @@ export function useDocuments(): UseDocumentsReturn {
   }, []);
 
   useEffect(() => {
-    loadDocuments();
-  }, [loadDocuments]);
+    loadDocuments(page);
+  }, [page, loadDocuments]);
 
   const upload = useCallback(async (file: File) => {
     if (!file.name || !isAllowedFileType(file.name)) {
@@ -54,26 +71,30 @@ export function useDocuments(): UseDocumentsReturn {
     try {
       setUploading(true);
       setError(null);
-      const doc = await uploadDocument(file);
-      setDocuments((prev) => [doc, ...prev]);
+      await uploadDocument(file);
+      setPageRaw(1);
+      await loadDocuments(1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to upload document");
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [loadDocuments]);
 
   const remove = useCallback(async (id: string) => {
     try {
       setError(null);
       await deleteDocument(id);
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      await loadDocuments(page);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to delete document");
     }
-  }, []);
+  }, [page, loadDocuments]);
 
   const clearError = useCallback(() => setError(null), []);
 
-  return { documents, loading, error, uploading, upload, remove, clearError };
+  return {
+    documents, total, page, totalPages, setPage,
+    loading, error, uploading, upload, remove, clearError,
+  };
 }

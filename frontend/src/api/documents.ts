@@ -11,6 +11,7 @@ export interface DocumentResponse {
 
 export interface DocumentListResponse {
   documents: DocumentResponse[];
+  total: number;
 }
 
 const ALLOWED_EXTENSIONS = new Set([".pdf", ".txt", ".md"]);
@@ -24,8 +25,15 @@ export function isAllowedFileType(filename: string): boolean {
   return ALLOWED_EXTENSIONS.has(getFileExtension(filename));
 }
 
-export async function fetchDocuments(): Promise<DocumentListResponse> {
-  const response = await fetch("/api/documents");
+export async function fetchDocuments(
+  limit: number,
+  offset: number,
+): Promise<DocumentListResponse> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  const response = await fetch(`/api/documents?${params}`);
   await throwIfNotOk(response);
   return response.json();
 }
