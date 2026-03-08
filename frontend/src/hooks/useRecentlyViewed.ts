@@ -9,22 +9,29 @@ interface RecentlyViewedItem {
 
 const STORAGE_KEY = "exiles-archive-recently-viewed";
 const MAX_ITEMS = 10;
+const EMPTY: RecentlyViewedItem[] = [];
 
 let listeners: Array<() => void> = [];
+let cachedRaw: string | null = null;
+let cachedSnapshot: RecentlyViewedItem[] = EMPTY;
 
 function emitChange() {
+  cachedRaw = null;
   for (const listener of listeners) {
     listener();
   }
 }
 
 function getSnapshot(): RecentlyViewedItem[] {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw === cachedRaw) return cachedSnapshot;
+  cachedRaw = raw;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    cachedSnapshot = raw ? JSON.parse(raw) : EMPTY;
   } catch {
-    return [];
+    cachedSnapshot = EMPTY;
   }
+  return cachedSnapshot;
 }
 
 function subscribe(listener: () => void): () => void {

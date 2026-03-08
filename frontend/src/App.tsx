@@ -9,8 +9,8 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 
 function App() {
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
+    <BrowserRouter>
+      <ErrorBoundary>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
@@ -20,8 +20,8 @@ function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
-      </BrowserRouter>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </BrowserRouter>
   );
 }
 
