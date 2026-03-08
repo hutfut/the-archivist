@@ -67,6 +67,7 @@ export function Layout() {
         open={chatOpen}
         onClose={() => setChatOpen(false)}
         chat={chat}
+        hasDocuments={docs.total > 0}
         prefill={chatPrefill}
         onPrefillConsumed={() => {
           setChatPrefill(undefined);

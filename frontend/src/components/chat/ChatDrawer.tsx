@@ -20,6 +20,7 @@ interface ChatDrawerProps {
   open: boolean;
   onClose: () => void;
   chat: UseChatReturn;
+  hasDocuments: boolean;
   prefill?: string;
   onPrefillConsumed: () => void;
 }
@@ -28,6 +29,7 @@ export function ChatDrawer({
   open,
   onClose,
   chat,
+  hasDocuments,
   prefill,
   onPrefillConsumed,
 }: ChatDrawerProps) {
@@ -130,11 +132,11 @@ export function ChatDrawer({
 
         {activeConversationId ? (
           <>
-            <MessageList messages={messages} streaming={streaming} />
+            <MessageList messages={messages} streaming={streaming} hasDocuments={hasDocuments} />
             <MessageInput onSend={sendMessage} disabled={sending} />
           </>
         ) : (
-          <DrawerEmptyState onCreate={createChat} />
+          <DrawerEmptyState onCreate={createChat} hasDocuments={hasDocuments} />
         )}
       </div>
     </>
@@ -185,9 +187,11 @@ function ConversationBar({
 function MessageList({
   messages,
   streaming,
+  hasDocuments,
 }: {
   messages: MessageResponse[];
   streaming: StreamingMessage | null;
+  hasDocuments: boolean;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -198,7 +202,14 @@ function MessageList({
   if (messages.length === 0 && !streaming) {
     return (
       <div className="flex-1 flex items-center justify-center text-[var(--color-text-muted)] text-sm px-6 text-center">
-        Send a message to start the conversation.
+        {hasDocuments ? (
+          "Send a message to start the conversation."
+        ) : (
+          <span>
+            <Link to="/" className="text-[var(--color-accent-gold)] hover:underline">Upload some documents</Link>
+            {" "}first, then ask me questions about them.
+          </span>
+        )}
       </div>
     );
   }
@@ -356,7 +367,7 @@ function MessageInput({
   );
 }
 
-function DrawerEmptyState({ onCreate }: { onCreate: () => Promise<void> }) {
+function DrawerEmptyState({ onCreate, hasDocuments }: { onCreate: () => Promise<void>; hasDocuments: boolean }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
       <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-accent-gold)]/20 to-[var(--color-accent-crimson)]/10 border border-[var(--color-border-gold)] flex items-center justify-center">
@@ -367,12 +378,21 @@ function DrawerEmptyState({ onCreate }: { onCreate: () => Promise<void> }) {
           The Archivist
         </h3>
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-          I am The Archivist. Ask me anything about your uploaded documents...
+          {hasDocuments
+            ? "I am The Archivist. Ask me anything about your uploaded documents..."
+            : (
+              <>
+                <Link to="/" className="text-[var(--color-accent-gold)] hover:underline">Upload some documents</Link>
+                {" "}first, then ask me questions about them.
+              </>
+            )}
         </p>
       </div>
-      <button type="button" onClick={onCreate} className="poe-btn-primary text-sm">
-        New Conversation
-      </button>
+      {hasDocuments && (
+        <button type="button" onClick={onCreate} className="poe-btn-primary text-sm">
+          New Conversation
+        </button>
+      )}
     </div>
   );
 }
