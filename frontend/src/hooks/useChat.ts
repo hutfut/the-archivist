@@ -45,6 +45,7 @@ export function useChat(): UseChatReturn {
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -117,7 +118,9 @@ export function useChat(): UseChatReturn {
 
   const sendMessage = useCallback(
     (content: string) => {
-      if (!activeConversationId || sending) return;
+      if (!activeConversationId || sendingRef.current) return;
+
+      sendingRef.current = true;
 
       const userMessage: MessageResponse = {
         id: `temp-${Date.now()}`,
@@ -162,6 +165,7 @@ export function useChat(): UseChatReturn {
           setMessages((prev) => [...prev, assistantMessage]);
           setStreaming(null);
           setSending(false);
+          sendingRef.current = false;
           abortRef.current = null;
 
           setConversations((prev) => {
@@ -177,12 +181,13 @@ export function useChat(): UseChatReturn {
         onError: (err) => {
           setStreaming(null);
           setSending(false);
+          sendingRef.current = false;
           setError(err.message || "Failed to send message");
           abortRef.current = null;
         },
       });
     },
-    [activeConversationId, sending],
+    [activeConversationId],
   );
 
   const clearError = useCallback(() => setError(null), []);
