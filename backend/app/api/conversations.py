@@ -161,32 +161,19 @@ def _chunk_text(text: str, chunk_size: int = STREAM_CHUNK_SIZE) -> list[str]:
     return chunks
 
 
-async def _stream_response(
+async def _stream_response_simulated(
     conversation_id: UUID,
     content: str,
     agent: CompiledStateGraph,
     max_history_messages: int,
 ) -> AsyncGenerator[str, None]:
-    """Async generator that yields SSE events for a chat message.
-
-    Creates its own DB session from the factory rather than using FastAPI DI
-    because async generators outlive the request scope -- FastAPI closes its
-    dependency-injected session when the endpoint returns, but the SSE body
-    is still being streamed to the client.
-
-    NOTE: This is *simulated* streaming -- the agent runs to completion, then
-    the response text is chunked into word-groups emitted as content_delta
-    events with small delays. Real token-level streaming requires a streaming-
-    capable LLM; with mock or Ollama, replace ``agent.ainvoke`` with
-    ``agent.astream_events`` and yield deltas as they arrive from the model.
-    """
-    logger.info("Stream started for conversation %s (%d chars)", conversation_id, len(content))
+    """Simulated streaming for mock provider: run agent to completion, then
+    chunk the response into word-groups emitted as SSE content_delta events."""
     session_factory = get_session_factory()
 
     async with session_factory() as session:
         conversation = await conversation_service.get_conversation(conversation_id, session)
         if conversation is None:
-            logger.warning("Stream aborted: conversation %s not found", conversation_id)
             yield _sse_event("error", {"detail": "Conversation not found"})
             return
 
@@ -203,13 +190,9 @@ async def _stream_response(
             return
 
     msg_id = str(assistant_message.id)
-
     yield _sse_event(
         "message_start",
-        {
-            "message_id": msg_id,
-            "conversation_id": str(assistant_message.conversation_id),
-        },
+        {"message_id": msg_id, "conversation_id": str(assistant_message.conversation_id)},
     )
 
     for chunk in _chunk_text(assistant_message.content):
@@ -223,9 +206,147 @@ async def _stream_response(
     )
     yield _sse_event("sources", {"sources": sources})
     yield _sse_event("message_end", {"message_id": msg_id})
-    logger.info(
-        "Stream completed for conversation %s (message %s)", conversation_id, assistant_message.id
+
+
+async def _stream_response_real(
+    conversation_id: UUID,
+    content: str,
+    agent: CompiledStateGraph,
+    max_history_messages: int,
+) -> AsyncGenerator[str, None]:
+    """Real token streaming for LLM providers that support it (Anthropic, Ollama).
+
+    Uses astream_events to yield token deltas as the model generates them.
+    Persists both messages after streaming completes.
+    """
+    session_factory = get_session_factory()
+
+    async with session_factory() as session:
+        conversation = await conversation_service.get_conversation(conversation_id, session)
+        if conversation is None:
+            yield _sse_event("error", {"detail": "Conversation not found"})
+            return
+
+        await conversation_service.add_message(
+            conversation_id=conversation_id,
+            role="user",
+            content=content,
+            session=session,
+            commit=False,
+        )
+
+        history = await conversation_service.get_conversation_history(
+            conversation_id, session, max_messages=max_history_messages
+        )
+
+        yield _sse_event(
+            "message_start",
+            {"message_id": "", "conversation_id": str(conversation_id)},
+        )
+
+        full_response = ""
+        sources: list[dict[str, Any]] = []
+        started_generating = False
+
+        try:
+            async for event in agent.astream_events(
+                {"query": content, "conversation_history": history},
+                version="v2",
+            ):
+                kind = event.get("event", "")
+
+                if kind == "on_chat_model_stream":
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk is not None:
+                        token = str(chunk.content) if hasattr(chunk, "content") else ""
+                        if token:
+                            if not started_generating:
+                                started_generating = True
+                            full_response += token
+                            yield _sse_event("content_delta", {"delta": token})
+
+                elif kind == "on_chain_end" and event.get("name") == "generate_response":
+                    output = event.get("data", {}).get("output", {})
+                    sources = output.get("sources", [])
+
+        except Exception:
+            logger.exception("Agent stream failed for conversation %s", conversation_id)
+            await session.rollback()
+            yield _sse_event("error", {"detail": "The AI agent failed to generate a response."})
+            return
+
+        if not full_response:
+            graph_result = None
+            try:
+                graph_result = await agent.ainvoke(
+                    {"query": content, "conversation_history": history}
+                )
+            except Exception:
+                logger.exception("Agent fallback failed for conversation %s", conversation_id)
+                await session.rollback()
+                yield _sse_event(
+                    "error", {"detail": "The AI agent failed to generate a response."}
+                )
+                return
+
+            full_response = graph_result.get("response", "")
+            sources = graph_result.get("sources", [])
+            for chunk in _chunk_text(full_response):
+                yield _sse_event("content_delta", {"delta": chunk})
+                await asyncio.sleep(0.02)
+
+        assistant_message = await conversation_service.add_message(
+            conversation_id=conversation_id,
+            role="assistant",
+            content=full_response,
+            session=session,
+            sources=sources or None,
+            commit=False,
+        )
+
+        await conversation_service.set_conversation_title(
+            conversation_id, content, session, commit=False
+        )
+        await session.commit()
+
+    msg_id = str(assistant_message.id)
+    sources_json = (
+        [s.model_dump(mode="json") for s in assistant_message.sources]
+        if assistant_message.sources
+        else []
     )
+    yield _sse_event("sources", {"sources": sources_json})
+    yield _sse_event("message_end", {"message_id": msg_id})
+
+
+async def _stream_response(
+    conversation_id: UUID,
+    content: str,
+    agent: CompiledStateGraph,
+    max_history_messages: int,
+    llm_provider: str,
+) -> AsyncGenerator[str, None]:
+    """Route to the appropriate streaming implementation based on LLM provider."""
+    logger.info(
+        "Stream started for conversation %s (%d chars, provider=%s)",
+        conversation_id,
+        len(content),
+        llm_provider,
+    )
+
+    if llm_provider == "mock":
+        gen = _stream_response_simulated(
+            conversation_id, content, agent, max_history_messages
+        )
+    else:
+        gen = _stream_response_real(
+            conversation_id, content, agent, max_history_messages
+        )
+
+    async for event in gen:
+        yield event
+
+    logger.info("Stream completed for conversation %s", conversation_id)
 
 
 @router.post("/conversations/{conversation_id}/messages/stream")
@@ -236,7 +357,13 @@ async def send_message_stream(
     agent: CompiledStateGraph = Depends(get_agent),
 ) -> StreamingResponse:
     return StreamingResponse(
-        _stream_response(conversation_id, request.content, agent, settings.max_history_messages),
+        _stream_response(
+            conversation_id,
+            request.content,
+            agent,
+            settings.max_history_messages,
+            settings.llm_provider,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
