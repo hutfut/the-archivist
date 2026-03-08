@@ -11,6 +11,7 @@ from sqlalchemy import text
 from app.agent.graph import build_agent_graph
 from app.agent.llm import MockChatModel
 from app.api.conversations import get_agent, init_agent
+from app.api.search import get_retrieval_service, init_search
 from app.config import Settings, get_settings
 from app.db.models import Base
 from app.db.session import close_db, get_session_factory, init_db
@@ -70,6 +71,7 @@ async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
     init_processor(mock_embeddings)
 
     retrieval_service = RetrievalService(mock_embeddings, retrieval_mode="vector")
+    init_search(retrieval_service)
     mock_llm = MockChatModel()
     agent_graph = build_agent_graph(
         retrieval_service=retrieval_service,
@@ -85,6 +87,7 @@ async def client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_settings] = lambda: test_settings
     app.dependency_overrides[get_processor] = lambda: get_processor()
     app.dependency_overrides[get_agent] = lambda: agent_graph
+    app.dependency_overrides[get_retrieval_service] = lambda: retrieval_service
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

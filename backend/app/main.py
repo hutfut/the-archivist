@@ -31,6 +31,8 @@ from app.api.conversations import init_agent
 from app.api.conversations import router as conversations_router
 from app.api.documents import router as documents_router
 from app.api.health import router as health_router
+from app.api.search import init_search
+from app.api.search import router as search_router
 from app.config import get_settings
 from app.db.session import close_db, get_session_factory, init_db
 from app.services.embedding import HuggingFaceEmbeddingService
@@ -50,6 +52,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     retrieval_service = RetrievalService(
         embedding_service, retrieval_mode=settings.retrieval_mode,
     )
+    init_search(retrieval_service)
+
     llm = create_llm(settings)
     agent_graph = build_agent_graph(
         retrieval_service=retrieval_service,
@@ -88,6 +92,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(documents_router)
+    app.include_router(search_router)
     app.include_router(conversations_router)
 
     return app
