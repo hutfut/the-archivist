@@ -15,6 +15,7 @@ import type {
 } from "../../api/conversations";
 import type { StreamingMessage, UseChatReturn } from "../../hooks/useChat";
 import { toSlug } from "../../lib/utils";
+import { CaretakerAvatar, UserAvatar } from "./avatars";
 
 interface ChatDrawerProps {
   open: boolean;
@@ -93,15 +94,13 @@ export function ChatDrawer({
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-accent-gold)] to-[var(--color-accent-crimson)] flex items-center justify-center">
-              <span className="text-sm font-bold text-[var(--color-bg-primary)]">A</span>
-            </div>
+            <CaretakerAvatar size="sm" />
             <div>
               <h3 className="text-sm font-heading font-semibold text-[var(--color-accent-gold)]">
-                The Archivist
+                The Caretaker
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
-                AI Document Assistant
+                Keeper of The Archive
               </p>
             </div>
           </div>
@@ -136,7 +135,14 @@ export function ChatDrawer({
             <MessageInput onSend={sendMessage} disabled={sending} />
           </>
         ) : (
-          <DrawerEmptyState onCreate={createChat} hasDocuments={hasDocuments} />
+          <DrawerEmptyState
+            onCreate={createChat}
+            hasDocuments={hasDocuments}
+            onStarterPrompt={async (prompt: string) => {
+              await createChat();
+              sendMessage(prompt);
+            }}
+          />
         )}
       </div>
     </>
@@ -220,8 +226,9 @@ function MessageList({
         <MessageBubble key={msg.id} message={msg} />
       ))}
       {streaming && (
-        <div className="flex justify-start">
-          <div className="max-w-[90%] rounded-lg px-3 py-2 bg-[var(--color-bg-tertiary)] border border-[var(--color-border-gold)] text-[var(--color-text-primary)]">
+        <div className="flex items-start gap-2 justify-start">
+          <CaretakerAvatar size="sm" />
+          <div className="max-w-[80%] rounded-lg px-3 py-2 bg-[var(--color-bg-tertiary)] border border-[var(--color-border-gold)] text-[var(--color-text-primary)]">
             {streaming.content ? (
               <div className="prose prose-sm prose-invert max-w-none text-[var(--color-text-primary)] text-sm [&_a]:text-[var(--color-accent-blue)]">
                 <Markdown>{streaming.content}</Markdown>
@@ -244,9 +251,10 @@ function MessageBubble({ message }: { message: MessageResponse }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+    <div className={`flex items-start gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
+      {!isUser && <CaretakerAvatar size="sm" />}
       <div
-        className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
+        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
           isUser
             ? "bg-[var(--color-accent-gold-dim)] text-[var(--color-text-heading)]"
             : "bg-[var(--color-bg-tertiary)] border border-[var(--color-border-gold)] text-[var(--color-text-primary)]"
@@ -263,6 +271,7 @@ function MessageBubble({ message }: { message: MessageResponse }) {
           <SourcesDisplay sources={message.sources} />
         )}
       </div>
+      {isUser && <UserAvatar size="sm" />}
     </div>
   );
 }
@@ -367,19 +376,32 @@ function MessageInput({
   );
 }
 
-function DrawerEmptyState({ onCreate, hasDocuments }: { onCreate: () => Promise<void>; hasDocuments: boolean }) {
+const STARTER_PROMPTS = [
+  "What themes connect these documents?",
+  "Summarize the key findings",
+  "What are the most important details?",
+  "Find contradictions across sources",
+];
+
+function DrawerEmptyState({
+  onCreate,
+  hasDocuments,
+  onStarterPrompt,
+}: {
+  onCreate: () => Promise<void>;
+  hasDocuments: boolean;
+  onStarterPrompt: (prompt: string) => void;
+}) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
-      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--color-accent-gold)]/20 to-[var(--color-accent-crimson)]/10 border border-[var(--color-border-gold)] flex items-center justify-center">
-        <span className="text-2xl font-heading text-[var(--color-accent-gold)]">A</span>
-      </div>
+      <CaretakerAvatar size="lg" />
       <div>
         <h3 className="font-heading text-base font-semibold text-[var(--color-accent-gold)]">
-          The Archivist
+          The Caretaker
         </h3>
         <p className="text-sm text-[var(--color-text-secondary)] mt-1">
           {hasDocuments
-            ? "I am The Archivist. Ask me anything about your uploaded documents..."
+            ? "I am The Caretaker. Ask me anything about the documents in The Archive..."
             : (
               <>
                 <Link to="/" className="text-[var(--color-accent-gold)] hover:underline">Upload some documents</Link>
@@ -389,9 +411,23 @@ function DrawerEmptyState({ onCreate, hasDocuments }: { onCreate: () => Promise<
         </p>
       </div>
       {hasDocuments && (
-        <button type="button" onClick={onCreate} className="poe-btn-primary text-sm">
-          New Conversation
-        </button>
+        <>
+          <div className="flex flex-wrap justify-center gap-2 max-w-sm">
+            {STARTER_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => onStarterPrompt(prompt)}
+                className="text-xs px-3 py-1.5 rounded-full border border-[var(--color-border-gold)] text-[var(--color-accent-gold)] hover:bg-[var(--color-accent-gold)]/10 hover:border-[var(--color-accent-gold)] transition-colors cursor-pointer"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={onCreate} className="poe-btn-primary text-sm">
+            New Conversation
+          </button>
+        </>
       )}
     </div>
   );
