@@ -6,9 +6,11 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
+import { Link } from "react-router-dom";
 import Markdown from "react-markdown";
 import type { ConversationResponse, MessageResponse, SourceAttribution } from "../api/conversations.ts";
 import type { StreamingMessage, UseChatReturn } from "../hooks/useChat.ts";
+import { toSlug } from "../lib/utils.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
 type ChatProps = UseChatReturn;
@@ -272,30 +274,33 @@ function SourceItem({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const truncated =
-    source.chunk_content.length > 120
-      ? source.chunk_content.slice(0, 120) + "..."
-      : source.chunk_content;
-
   return (
     <li>
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full text-left text-xs cursor-pointer"
-      >
-        <span className="font-medium text-blue-600 dark:text-blue-400">
+      <div className="flex items-baseline gap-1 text-xs">
+        <Link
+          to={`/doc/${toSlug(source.document_id, source.filename)}`}
+          className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+        >
           {source.section_heading
             ? `${source.filename} > ${source.section_heading}`
             : source.filename}
+        </Link>
+        <span className="text-gray-400 dark:text-gray-500">
+          ({(source.similarity_score * 100).toFixed(0)}%)
         </span>
-        <span className="text-gray-400 dark:text-gray-500 ml-2">
-          ({(source.similarity_score * 100).toFixed(0)}% match)
-        </span>
-      </button>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-pre-wrap">
-        {isExpanded ? source.chunk_content : truncated}
-      </p>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer ml-1"
+        >
+          {isExpanded ? "less" : "more"}
+        </button>
+      </div>
+      {isExpanded && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-pre-wrap">
+          {source.chunk_content}
+        </p>
+      )}
     </li>
   );
 }
