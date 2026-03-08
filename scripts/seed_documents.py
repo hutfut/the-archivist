@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import zipfile
 from collections.abc import Iterable, Iterator, Sequence
@@ -98,8 +99,9 @@ def iter_docs_from_paths(paths: Iterable[Path]) -> Iterator[tuple[str, bytes, st
             logger.warning("No such path: %s", p)
 
 
-def upload_file(
-    client: httpx.Client,
+async def upload_file(
+    client: httpx.AsyncClient,
+    semaphore: asyncio.Semaphore,
     api_url: str,
     filename: str,
     content: bytes,
@@ -108,11 +110,13 @@ def upload_file(
     """Upload a document to the backend. Returns True on success."""
     url = f"{api_url.rstrip('/')}/api/documents"
     files = {"file": (filename, content, content_type)}
-    try:
-        resp = client.post(url, files=files)
-    except httpx.RequestError as exc:
-        logger.error("Upload failed for '%s': %s", filename, exc)
-        return False
+    async with semaphore:
+        logger.info("Uploading: %s", filename)
+        try:
+            resp = await client.post(url, files=files)
+        except httpx.RequestError as exc:
+            logger.error("Upload failed for '%s': %s", filename, exc)
+            return False
     if resp.status_code == 201:
         return True
     logger.error(
@@ -124,7 +128,7 @@ def upload_file(
     return False
 
 
-def run(args: argparse.Namespace) -> int:
+async def run(args: argparse.Namespace) -> int:
     """Main entry point. Returns 0 on success, 1 if any upload failed."""
     sources: list[Iterator[tuple[str, bytes, str]]] = []
 
@@ -147,27 +151,26 @@ def run(args: argparse.Namespace) -> int:
         logger.error("Provide at least one of --zip or --paths")
         return 1
 
-    client = httpx.Client(timeout=UPLOAD_TIMEOUT)
-    succeeded = 0
-    failed = 0
+    docs = [doc for source in sources for doc in source]
 
-    try:
-        for source in sources:
-            for filename, content, content_type in source:
-                if args.dry_run:
-                    logger.info("Would upload: %s", filename)
-                    succeeded += 1
-                    continue
-                logger.info("Uploading: %s", filename)
-                if upload_file(client, args.api_url, filename, content, content_type):
-                    succeeded += 1
-                else:
-                    failed += 1
+    if args.dry_run:
+        for filename, _, _ in docs:
+            logger.info("Would upload: %s", filename)
+        logger.info("Done: %d would be uploaded", len(docs))
+        return 0
 
-        logger.info("Done: %d succeeded, %d failed", succeeded, failed)
-        return 0 if failed == 0 else 1
-    finally:
-        client.close()
+    semaphore = asyncio.Semaphore(args.concurrency)
+    async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
+        tasks = [
+            upload_file(client, semaphore, args.api_url, fn, content, ct)
+            for fn, content, ct in docs
+        ]
+        results = await asyncio.gather(*tasks)
+
+    succeeded = sum(results)
+    failed = len(results) - succeeded
+    logger.info("Done: %d succeeded, %d failed", succeeded, failed)
+    return 0 if failed == 0 else 1
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -192,6 +195,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Paths to files or directories (supported: .md, .txt, .pdf)",
     )
     parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Max concurrent uploads (default: 20)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="List documents that would be uploaded without uploading",
@@ -205,7 +215,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%H:%M:%S",
     )
-    return run(parse_args(argv))
+    return asyncio.run(run(parse_args(argv)))
 
 
 if __name__ == "__main__":
