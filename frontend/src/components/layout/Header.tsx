@@ -2,11 +2,10 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type Keyboard
 import { Link, useNavigate } from "react-router-dom";
 
 interface HeaderProps {
-  onToggleChat: () => void;
   onUploadClick: () => void;
 }
 
-export function Header({ onToggleChat, onUploadClick }: HeaderProps) {
+export function Header({ onUploadClick }: HeaderProps) {
   const [searchValue, setSearchValue] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -42,7 +41,7 @@ export function Header({ onToggleChat, onUploadClick }: HeaderProps) {
           </svg>
         </div>
         <span className="font-heading text-lg font-semibold text-[var(--color-accent-gold)] tracking-wide group-hover:text-[var(--color-accent-gold-bright)] transition-colors hidden sm:inline">
-          Exile's Archive
+          The Archive
         </span>
       </Link>
 
@@ -78,15 +77,6 @@ export function Header({ onToggleChat, onUploadClick }: HeaderProps) {
         <Link to="/" className="poe-btn-secondary text-xs px-3 py-2">
           Library
         </Link>
-
-        <button
-          type="button"
-          onClick={onToggleChat}
-          className="poe-btn-secondary text-xs px-3 py-2"
-          title="Open chat"
-        >
-          <ChatIcon className="w-4 h-4" />
-        </button>
       </nav>
     </header>
   );
@@ -104,14 +94,6 @@ function UploadIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
-    </svg>
-  );
-}
-
-function ChatIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 20.25V4.125C3.75 3.504 4.254 3 4.875 3h14.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125H7.875L3.75 20.25z" />
     </svg>
   );
 }
