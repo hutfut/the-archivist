@@ -5,7 +5,7 @@
 ![Frontend CI](https://github.com/hutfut/the-archivist/actions/workflows/frontend.yml/badge.svg)
 ![Backend CI](https://github.com/hutfut/the-archivist/actions/workflows/backend.yml/badge.svg)
 
-<!-- TODO: Add screenshot of the running app here -->
+<!-- Add screenshot of the running app here -->
 
 ---
 
