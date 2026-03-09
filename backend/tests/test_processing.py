@@ -140,6 +140,54 @@ class TestMarkdownChunking:
         all_content = " ".join(c.content for c in chunks)
         assert "quick brown fox" in all_content
 
+    def test_horizontal_rule_separates_blocks(self):
+        """Chunks do not mix content from opposite sides of a horizontal rule."""
+        md = "First block content here.\n\n---\n\nSecond block content there."
+        chunks = chunk_markdown(md)
+        assert len(chunks) >= 2
+        first_contents = [c.content for c in chunks if "First block" in c.content]
+        second_contents = [c.content for c in chunks if "Second block" in c.content]
+        assert first_contents and second_contents
+        for content in first_contents:
+            assert "Second block" not in content
+        for content in second_contents:
+            assert "First block" not in content
+
+    def test_horizontal_rule_with_headers_preserves_heading_path(self):
+        """Each HR-separated block is parsed for headers; chunks get correct heading within that block."""
+        md = (
+            "# Top\n\n## Section\n\nContent before rule.\n\n"
+            "---\n\nContent after rule.\n\n"
+            "### Sub\n\nContent under sub."
+        )
+        chunks = chunk_markdown(md)
+        before_rule = [c for c in chunks if "Content before rule" in c.content]
+        under_sub = [c for c in chunks if "Content under sub" in c.content]
+        assert before_rule and before_rule[0].section_heading == "Top > Section"
+        assert under_sub and under_sub[0].section_heading == "Sub"
+
+    def test_horizontal_rule_at_start(self):
+        """HR at document start: first block can be empty and skipped."""
+        md = "---\n\nOnly block after HR."
+        chunks = chunk_markdown(md)
+        assert len(chunks) >= 1
+        assert any("Only block" in c.content for c in chunks)
+
+    def test_horizontal_rule_at_end(self):
+        """HR at document end: last block before HR is retained."""
+        md = "Content before trailing HR.\n\n---"
+        chunks = chunk_markdown(md)
+        assert len(chunks) >= 1
+        assert any("Content before trailing" in c.content for c in chunks)
+
+    def test_multiple_consecutive_horizontal_rules(self):
+        """Multiple consecutive HRs produce empty blocks that are skipped."""
+        md = "A\n\n---\n\n---\n\nB"
+        chunks = chunk_markdown(md)
+        a_chunks = [c for c in chunks if "A" in c.content and "B" not in c.content]
+        b_chunks = [c for c in chunks if "B" in c.content]
+        assert a_chunks and b_chunks
+
 
 class TestBuildEmbeddingText:
     def test_with_heading(self):

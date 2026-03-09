@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -38,6 +39,9 @@ _MARKDOWN_HEADERS = [
     ("###", "h3"),
     ("####", "h4"),
 ]
+
+# Standalone horizontal-rule lines (---, ***, ___) split major wiki blocks.
+_HORIZONTAL_RULE_PATTERN = re.compile(r"(?:^|\n)\s*(?:---|\*\*\*|___)\s*(?:\n|$)")
 
 
 @dataclass(frozen=True)
@@ -81,36 +85,26 @@ def _build_heading_path(metadata: dict[str, str]) -> str | None:
     return " > ".join(parts) if parts else None
 
 
-def chunk_markdown(
-    text: str,
-    chunk_size: int = MARKDOWN_CHUNK_SIZE,
-    chunk_overlap: int = MARKDOWN_CHUNK_OVERLAP,
+def _split_on_horizontal_rules(text: str) -> list[str]:
+    """Split markdown on standalone horizontal-rule lines (---, ***, ___). Returns non-empty blocks."""
+    blocks = _HORIZONTAL_RULE_PATTERN.split(text)
+    return [b.strip() for b in blocks if b.strip()]
+
+
+def _chunk_markdown_block(
+    block: str,
+    chunk_size: int,
+    chunk_overlap: int,
 ) -> list[ChunkWithHeading]:
-    """Split markdown text by section headers, sub-splitting oversized sections.
-
-    First pass: split on #, ##, ###, #### headers (keeping each section coherent).
-    Second pass: any section exceeding chunk_size is further split using
-    RecursiveCharacterTextSplitter; sub-chunks inherit the parent heading.
-
-    Args:
-        text: Markdown text to split.
-        chunk_size: Maximum characters per chunk (for sub-splitting). Default 700 for wiki-aware chunking.
-        chunk_overlap: Overlap characters for sub-splits. Default 140.
-
-    Returns:
-        List of ChunkWithHeading, or empty list if text is empty.
-    """
-    if not text.strip():
-        return []
-
+    """Split a single markdown block by headers, then by size. No HR splitting."""
     header_splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=_MARKDOWN_HEADERS,
         strip_headers=True,
     )
-    sections = header_splitter.split_text(text)
+    sections = header_splitter.split_text(block)
 
     if not sections:
-        plain_chunks = chunk_text(text, chunk_size, chunk_overlap)
+        plain_chunks = chunk_text(block, chunk_size, chunk_overlap)
         return [ChunkWithHeading(content=c) for c in plain_chunks]
 
     size_splitter = RecursiveCharacterTextSplitter(
@@ -134,6 +128,36 @@ def chunk_markdown(
             for sub in sub_chunks:
                 result.append(ChunkWithHeading(content=sub, section_heading=heading))
 
+    return result
+
+
+def chunk_markdown(
+    text: str,
+    chunk_size: int = MARKDOWN_CHUNK_SIZE,
+    chunk_overlap: int = MARKDOWN_CHUNK_OVERLAP,
+) -> list[ChunkWithHeading]:
+    """Split markdown text by section headers and horizontal rules, sub-splitting oversized sections.
+
+    First pass: split on standalone horizontal rules (---, ***, ___).
+    Second pass (per block): split on #, ##, ###, #### headers.
+    Third pass: any section exceeding chunk_size is further split using
+    RecursiveCharacterTextSplitter; sub-chunks inherit the parent heading.
+
+    Args:
+        text: Markdown text to split.
+        chunk_size: Maximum characters per chunk (for sub-splitting). Default 700 for wiki-aware chunking.
+        chunk_overlap: Overlap characters for sub-splits. Default 140.
+
+    Returns:
+        List of ChunkWithHeading, or empty list if text is empty.
+    """
+    if not text.strip():
+        return []
+
+    blocks = _split_on_horizontal_rules(text)
+    result: list[ChunkWithHeading] = []
+    for block in blocks:
+        result.extend(_chunk_markdown_block(block, chunk_size, chunk_overlap))
     return result
 
 
