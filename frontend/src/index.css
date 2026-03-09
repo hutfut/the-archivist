@@ -249,35 +249,13 @@
   }
 
   .chat-btn-position {
-    right: 1rem;
-    bottom: 1rem;
-  }
-  @media (min-width: 640px) {
-    .chat-btn-position {
-      right: 1.5rem;
-      bottom: 1.5rem;
-    }
-  }
-  @media (min-width: 1280px) {
-    .chat-btn-position {
-      right: calc((100vw - 80rem) / 2 + 1.5rem + 7rem);
-    }
+    right: 1.5rem;
+    bottom: 1.5rem;
   }
 
   .chat-cta-position {
-    right: 5.75rem;
-    bottom: 1.25rem;
-  }
-  @media (min-width: 640px) {
-    .chat-cta-position {
-      right: 6.25rem;
-      bottom: 1.75rem;
-    }
-  }
-  @media (min-width: 1280px) {
-    .chat-cta-position {
-      right: calc((100vw - 80rem) / 2 + 1.5rem + 7rem + 4.75rem);
-    }
+    right: 6.25rem;
+    bottom: 1.75rem;
   }
 
   .chat-cta-bubble::after {
