@@ -287,9 +287,7 @@ async def _stream_response_real(
             except Exception:
                 logger.exception("Agent fallback failed for conversation %s", conversation_id)
                 await session.rollback()
-                yield _sse_event(
-                    "error", {"detail": "The AI agent failed to generate a response."}
-                )
+                yield _sse_event("error", {"detail": "The AI agent failed to generate a response."})
                 return
 
             full_response = graph_result.get("response", "")
@@ -338,13 +336,9 @@ async def _stream_response(
     )
 
     if llm_provider == "mock":
-        gen = _stream_response_simulated(
-            conversation_id, content, agent, max_history_messages
-        )
+        gen = _stream_response_simulated(conversation_id, content, agent, max_history_messages)
     else:
-        gen = _stream_response_real(
-            conversation_id, content, agent, max_history_messages
-        )
+        gen = _stream_response_real(conversation_id, content, agent, max_history_messages)
 
     async for event in gen:
         yield event

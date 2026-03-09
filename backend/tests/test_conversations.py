@@ -6,7 +6,6 @@ routing -> service -> agent -> database.
 
 import json
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -456,9 +455,7 @@ async def test_stream_real_filters_rewrite_node_tokens() -> None:
                 )
             ),
         ),
-        patch(
-            "app.api.conversations.conversation_service"
-        ) as mock_conv_service,
+        patch("app.api.conversations.conversation_service") as mock_conv_service,
     ):
         mock_conv_service.get_conversation = AsyncMock(return_value=mock_conversation)
         mock_conv_service.add_message = AsyncMock(return_value=fake_message)

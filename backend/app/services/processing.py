@@ -86,7 +86,7 @@ def _build_heading_path(metadata: dict[str, str]) -> str | None:
 
 
 def _split_on_horizontal_rules(text: str) -> list[str]:
-    """Split markdown on standalone horizontal-rule lines (---, ***, ___). Returns non-empty blocks."""
+    """Split on standalone horizontal-rule lines (---, ***, ___). Returns non-empty blocks."""
     blocks = _HORIZONTAL_RULE_PATTERN.split(text)
     return [b.strip() for b in blocks if b.strip()]
 
@@ -136,7 +136,7 @@ def chunk_markdown(
     chunk_size: int = MARKDOWN_CHUNK_SIZE,
     chunk_overlap: int = MARKDOWN_CHUNK_OVERLAP,
 ) -> list[ChunkWithHeading]:
-    """Split markdown text by section headers and horizontal rules, sub-splitting oversized sections.
+    """Split markdown by section headers and horizontal rules; sub-split oversized sections.
 
     First pass: split on standalone horizontal rules (---, ***, ___).
     Second pass (per block): split on #, ##, ###, #### headers.
@@ -145,7 +145,7 @@ def chunk_markdown(
 
     Args:
         text: Markdown text to split.
-        chunk_size: Maximum characters per chunk (for sub-splitting). Default 700 for wiki-aware chunking.
+        chunk_size: Max chars per chunk (sub-splitting). Default 700 for wiki-aware chunking.
         chunk_overlap: Overlap characters for sub-splits. Default 140.
 
     Returns:

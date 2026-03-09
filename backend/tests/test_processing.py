@@ -1,8 +1,8 @@
 from app.services.embedding import EMBEDDING_DIMENSION, MockEmbeddingService
 from app.services.processing import (
     DEFAULT_CHUNK_SIZE,
-    ChunkWithHeading,
     MARKDOWN_CHUNK_SIZE,
+    ChunkWithHeading,
     build_embedding_text,
     chunk_markdown,
     chunk_text,
@@ -154,7 +154,7 @@ class TestMarkdownChunking:
             assert "First block" not in content
 
     def test_horizontal_rule_with_headers_preserves_heading_path(self):
-        """Each HR-separated block is parsed for headers; chunks get correct heading within that block."""
+        """HR-separated blocks are parsed for headers; chunks get correct heading per block."""
         md = (
             "# Top\n\n## Section\n\nContent before rule.\n\n"
             "---\n\nContent after rule.\n\n"
