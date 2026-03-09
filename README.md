@@ -5,7 +5,7 @@
 ![Frontend CI](https://github.com/hutfut/the-archivist/actions/workflows/frontend.yml/badge.svg)
 ![Backend CI](https://github.com/hutfut/the-archivist/actions/workflows/backend.yml/badge.svg)
 
-<!-- Add screenshot of the running app here -->
+![The Archive](.docs/demo-screenshot.png)
 
 ---
 
@@ -116,7 +116,7 @@ Key architectural choices are recorded as ADRs in [`.docs/adr/`](.docs/adr/):
 
 ## Process Audit Trail
 
-The `.cursor/plans/` directory contains structured implementation plans that show how problems were decomposed, what trade-offs were considered, and how AI tools were used throughout development. These serve the same intent as the prompt's encouragement to save LLM/agent chat history, in a more structured and reviewer-friendly form.
+The `.cursor/plans/` directory contains structured implementation plans.
 
 ---
 
