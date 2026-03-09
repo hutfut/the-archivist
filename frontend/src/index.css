@@ -79,26 +79,6 @@
     border: 1px solid var(--color-border);
     border-radius: 0.5rem;
     position: relative;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .poe-card:hover {
-    border-color: var(--color-accent-gold-dim);
-    box-shadow: 0 0 12px rgba(200, 170, 110, 0.08);
-  }
-
-  .poe-card::before {
-    content: "";
-    position: absolute;
-    top: -1px;
-    left: 10%;
-    right: 10%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--color-accent-gold-dim), transparent);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  .poe-card:hover::before {
-    opacity: 1;
   }
 
   .poe-btn-primary {
