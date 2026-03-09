@@ -99,21 +99,6 @@ See [`.env.example`](.env.example) for all available configuration.
 
 ---
 
-## Design Decisions
-
-Key architectural choices are recorded as ADRs in [`.docs/adr/`](.docs/adr/):
-
-| Decision | Summary |
-|----------|---------|
-| [ADR-0001](.docs/adr/0001-use-python-fastapi-react.md) | Python + FastAPI + React + LangGraph -- Python-first because the LangChain ecosystem is Python-native |
-| [ADR-0002](.docs/adr/0002-data-storage-strategy.md) | PostgreSQL with pgvector for metadata and embeddings in one store; filesystem for raw uploads |
-| [ADR-0004](.docs/adr/0004-langgraph-agent-architecture.md) | LangGraph StateGraph with retrieve/grade/generate nodes and pluggable LLM providers |
-| [ADR-0006](.docs/adr/0006-hybrid-search-and-retrieval-quality.md) | Hybrid search (vector + BM25 with Reciprocal Rank Fusion) for retrieval quality |
-| [ADR-0008](.docs/adr/0008-poe2-design-system-approach.md) | PoE2-inspired design system via Tailwind v4 `@theme` tokens |
-| [ADR-0011](.docs/adr/0011-wiki-aware-chunking.md) | Wiki-aware Markdown chunking with header hierarchy and horizontal rule splitting |
-
----
-
 ## Process Audit Trail
 
 The `.cursor/plans/` directory contains structured implementation plans.
