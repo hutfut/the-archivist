@@ -88,7 +88,7 @@ export function ChatDrawer({
       )}
 
       <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[420px] bg-[var(--color-bg-secondary)] border-l border-[var(--color-border)] shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-full chat-drawer-width bg-[var(--color-bg-secondary)] border-l border-[var(--color-border)] shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -230,7 +230,7 @@ function MessageList({
           <CaretakerAvatar size="sm" />
           <div className="max-w-[80%] rounded-lg px-3 py-2 bg-[var(--color-bg-tertiary)] border border-[var(--color-border-gold)] text-[var(--color-text-primary)]">
             {streaming.content ? (
-              <div className="prose prose-sm prose-invert max-w-none text-[var(--color-text-primary)] text-sm [&_a]:text-[var(--color-accent-blue)]">
+              <div className="prose prose-sm prose-invert max-w-none text-[var(--color-text-primary)] text-sm [&_a]:text-[var(--color-accent-blue)] chat-prose">
                 <Markdown>{streaming.content}</Markdown>
               </div>
             ) : (
@@ -263,7 +263,7 @@ function MessageBubble({ message }: { message: MessageResponse }) {
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <div className="prose prose-sm prose-invert max-w-none text-[var(--color-text-primary)] [&_a]:text-[var(--color-accent-blue)]">
+          <div className="prose prose-sm prose-invert max-w-none text-[var(--color-text-primary)] [&_a]:text-[var(--color-accent-blue)] chat-prose">
             <Markdown>{message.content}</Markdown>
           </div>
         )}
