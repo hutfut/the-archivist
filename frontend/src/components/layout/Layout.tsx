@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useChat } from "../../hooks/useChat";
 import { useDocuments } from "../../hooks/useDocuments";
@@ -63,6 +63,13 @@ export function Layout() {
       <Footer />
 
       <FloatingChatButton open={chatOpen} onClick={toggleChat} />
+
+      <ChatCTABubble
+        chatOpen={chatOpen}
+        hasConversations={chat.conversations.length > 0}
+        conversationsLoading={chat.loading}
+        onOpen={() => setChatOpen(true)}
+      />
 
       <ChatDrawer
         open={chatOpen}
@@ -130,5 +137,119 @@ function CloseIcon() {
     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
+  );
+}
+
+const CTA_MESSAGES = [
+  "Ask The Caretaker about your documents\u2026",
+  "Need help finding something in The Archive?",
+  "Chat with The Caretaker about anything here\u2026",
+  "Curious about connections between documents?",
+];
+
+const CTA_INITIAL_DELAY_MS = 45_000;
+const CTA_REPEAT_INTERVAL_MS = 300_000;
+const CTA_TYPING_SPEED_MS = 35;
+const CTA_DISPLAY_DURATION_MS = 4_000;
+const CTA_FADE_DURATION_MS = 500;
+
+type CTAPhase = "hidden" | "typing" | "showing" | "fading";
+
+function ChatCTABubble({
+  chatOpen,
+  hasConversations,
+  conversationsLoading,
+  onOpen,
+}: {
+  chatOpen: boolean;
+  hasConversations: boolean;
+  conversationsLoading: boolean;
+  onOpen: () => void;
+}) {
+  const [phase, setPhase] = useState<CTAPhase>("hidden");
+  const [typedText, setTypedText] = useState("");
+
+  const msgIdxRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const shouldShow = !hasConversations && !conversationsLoading && !chatOpen;
+
+  const cleanup = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const startTypingRef = useRef<() => void>(() => {});
+  startTypingRef.current = () => {
+    const msg = CTA_MESSAGES[msgIdxRef.current % CTA_MESSAGES.length];
+    let charIdx = 0;
+    setTypedText("");
+    setPhase("typing");
+
+    intervalRef.current = setInterval(() => {
+      charIdx++;
+      setTypedText(msg.slice(0, charIdx));
+
+      if (charIdx >= msg.length) {
+        if (intervalRef.current !== null) clearInterval(intervalRef.current);
+        intervalRef.current = null;
+        setPhase("showing");
+
+        timerRef.current = setTimeout(() => {
+          setPhase("fading");
+          timerRef.current = setTimeout(() => {
+            setPhase("hidden");
+            msgIdxRef.current = (msgIdxRef.current + 1) % CTA_MESSAGES.length;
+            timerRef.current = setTimeout(
+              () => startTypingRef.current(),
+              CTA_REPEAT_INTERVAL_MS,
+            );
+          }, CTA_FADE_DURATION_MS);
+        }, CTA_DISPLAY_DURATION_MS);
+      }
+    }, CTA_TYPING_SPEED_MS);
+  };
+
+  useEffect(() => {
+    if (!shouldShow) {
+      cleanup();
+      setPhase("hidden");
+      return;
+    }
+
+    timerRef.current = setTimeout(
+      () => startTypingRef.current(),
+      CTA_INITIAL_DELAY_MS,
+    );
+
+    return cleanup;
+  }, [shouldShow, cleanup]);
+
+  if (phase === "hidden") return null;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`fixed z-40 chat-cta-position chat-cta-bubble max-w-60 px-4 py-3 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border-gold)] shadow-lg cursor-pointer transition-opacity duration-500 ${
+        phase === "fading" ? "opacity-0" : "opacity-100"
+      }`}
+    >
+      <span className="text-sm text-[var(--color-text-primary)]">
+        {typedText}
+        {phase === "typing" && (
+          <span className="animate-blink-cursor text-[var(--color-accent-gold)]">
+            |
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
