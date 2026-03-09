@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# Frontend -- The Archive UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Document library, chat interface with The Caretaker, and semantic search -- built with React, Vite, and Tailwind CSS v4.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Prerequisites
 
-## React Compiler
+- Node 22+
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Local Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server starts at [http://localhost:5173](http://localhost:5173) and proxies `/api` requests to `http://localhost:8000` (the backend). Make sure the backend is running.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Available Scripts
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `dev` | `vite` | Start dev server with HMR |
+| `build` | `tsc -b && vite build` | Type-check and produce production build |
+| `lint` | `eslint .` | Run ESLint across the project |
+| `test` | `vitest run` | Run tests once |
+| `test:watch` | `vitest` | Run tests in watch mode |
+| `preview` | `vite preview` | Serve the production build locally |
+
+---
+
+## Running Tests
+
+```bash
+npm run test
 ```
+
+Tests use [Vitest](https://vitest.dev/) with [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) and jsdom. Test files live alongside their source code in `__tests__/` directories.
+
+---
+
+## Design System
+
+The UI uses a **Path of Exile 2-inspired** dark fantasy theme, implemented via Tailwind CSS v4 `@theme` tokens in [`src/index.css`](src/index.css).
+
+- **Fonts**: Cinzel (headings), Fira Sans (body)
+- **Palette**: Dark backgrounds (`#0c0c14`, `#141420`), gold accents (`#c8aa6e`), crimson highlights (`#8b2500`)
+- **Component classes**: `.poe-card`, `.poe-btn-primary`, `.poe-btn-secondary`, `.poe-input`, `.poe-badge`
+- **Rarity colors**: Normal (grey), Magic (blue), Rare (yellow), Unique (orange) -- used for visual hierarchy
+
+All theming is CSS-only with no runtime overhead.
