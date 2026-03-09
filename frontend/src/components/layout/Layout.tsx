@@ -92,7 +92,7 @@ function FloatingChatButton({ open, onClick }: { open: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       title="Ask The Caretaker"
-      className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 w-14 h-14 rounded-full poe-btn-primary flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer ${
+      className={`fixed z-40 chat-btn-position w-16 h-16 rounded-full poe-btn-primary flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer ${
         open ? "" : "animate-glow-pulse"
       }`}
     >
@@ -103,10 +103,24 @@ function FloatingChatButton({ open, onClick }: { open: boolean; onClick: () => v
 
 function TomeIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2C9.5 2 7 3 5 4.5V20.5C7 19 9.5 18 12 18V2Z" opacity="0.9" />
-      <path d="M12 2C14.5 2 17 3 19 4.5V20.5C17 19 14.5 18 12 18V2Z" opacity="0.7" />
-      <line x1="12" y1="2" x2="12" y2="18" stroke="currentColor" strokeWidth="0.5" opacity="0.5" />
+    <svg width="28" height="28" viewBox="2 0 32 32" fill="none" aria-hidden="true">
+      <path
+        d="M18 2C13 2 8 3.5 4 6V30C8 27.5 13 26 18 26V2Z"
+        fill="var(--color-bg-primary)"
+        opacity="0.9"
+      />
+      <path
+        d="M18 2C23 2 28 3.5 32 6V30C28 27.5 23 26 18 26V2Z"
+        fill="var(--color-bg-primary)"
+        opacity="0.75"
+      />
+      <line x1="18" y1="2" x2="18" y2="26" stroke="var(--color-accent-crimson)" strokeWidth="1.5" />
+      <line x1="7" y1="10" x2="15" y2="10" stroke="var(--color-bg-primary)" strokeWidth="0.8" opacity="0.5" />
+      <line x1="7" y1="14" x2="14" y2="14" stroke="var(--color-bg-primary)" strokeWidth="0.8" opacity="0.5" />
+      <line x1="7" y1="18" x2="15" y2="18" stroke="var(--color-bg-primary)" strokeWidth="0.8" opacity="0.5" />
+      <line x1="21" y1="10" x2="29" y2="10" stroke="var(--color-bg-primary)" strokeWidth="0.8" opacity="0.5" />
+      <line x1="21" y1="14" x2="28" y2="14" stroke="var(--color-bg-primary)" strokeWidth="0.8" opacity="0.5" />
+      <line x1="21" y1="18" x2="29" y2="18" stroke="var(--color-bg-primary)" strokeWidth="0.8" opacity="0.5" />
     </svg>
   );
 }
