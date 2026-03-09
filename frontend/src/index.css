@@ -52,6 +52,10 @@
     color: var(--color-text-heading);
   }
 
+  dialog[open] {
+    margin: auto;
+  }
+
   ::selection {
     background-color: rgba(200, 170, 110, 0.3);
     color: var(--color-text-primary);
