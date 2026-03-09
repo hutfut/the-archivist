@@ -4,7 +4,6 @@ import { useChat } from "../../hooks/useChat";
 import { useDocuments } from "../../hooks/useDocuments";
 import { ChatDrawer } from "../chat/ChatDrawer";
 import { UploadModal } from "../upload/UploadModal";
-import { Footer } from "./Footer";
 import { Header } from "./Header";
 
 export function Layout() {
@@ -59,8 +58,6 @@ export function Layout() {
           }}
         />
       </main>
-
-      <Footer />
 
       <FloatingChatButton open={chatOpen} onClick={toggleChat} />
 
