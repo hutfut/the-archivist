@@ -48,5 +48,6 @@ Trade-offs accepted, follow-on work, risks.
 | 0008 | [PoE2 Design System Approach](0008-poe2-design-system-approach.md) | 2026-03-08 |
 | 0009 | [Frontend Test Framework Choice](0009-frontend-test-framework.md) | 2026-03-08 |
 | 0010 | [Anthropic LLM Integration](0010-anthropic-llm-integration.md) | 2026-03-08 |
+| 0011 | [Wiki-aware chunking](0011-wiki-aware-chunking.md) | 2026-03-08 |
 
 When you add an ADR, append a row to this table.

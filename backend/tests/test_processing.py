@@ -2,6 +2,7 @@ from app.services.embedding import EMBEDDING_DIMENSION, MockEmbeddingService
 from app.services.processing import (
     DEFAULT_CHUNK_SIZE,
     ChunkWithHeading,
+    MARKDOWN_CHUNK_SIZE,
     build_embedding_text,
     chunk_markdown,
     chunk_text,
@@ -41,6 +42,17 @@ class TestChunking:
         for chunk in chunks:
             assert len(chunk) <= DEFAULT_CHUNK_SIZE
 
+    def test_plain_text_uses_default_chunk_size_not_markdown_size(self):
+        """chunk_text (plain/PDF path) uses 1000/200; markdown path uses 700/140."""
+        assert DEFAULT_CHUNK_SIZE == 1000
+        assert MARKDOWN_CHUNK_SIZE == 700
+        text = "X " * 400  # 800 chars
+        chunks_plain = chunk_text(text)
+        assert len(chunks_plain) == 1
+        chunks_md = chunk_markdown(f"# A\n\n{text}")  # default markdown size
+        for c in chunks_md:
+            assert len(c.content) <= MARKDOWN_CHUNK_SIZE
+
 
 class TestMarkdownChunking:
     def test_multi_section_produces_one_chunk_per_section(self):
@@ -64,6 +76,13 @@ class TestMarkdownChunking:
         assert len(deep_chunks) >= 1
         assert deep_chunks[0].section_heading == "Top > Middle > Deep"
 
+    def test_h4_in_heading_path(self):
+        md = "# Top\n\n## Middle\n\n### Deep\n\n#### Deeper\n\nContent under h4.\n"
+        chunks = chunk_markdown(md)
+        h4_chunks = [c for c in chunks if c.section_heading and "Deeper" in c.section_heading]
+        assert len(h4_chunks) >= 1
+        assert h4_chunks[0].section_heading == "Top > Middle > Deep > Deeper"
+
     def test_oversized_section_gets_sub_split(self):
         long_content = "This is a sentence with some words. " * 100  # ~3600 chars
         md = f"# Big Section\n\n{long_content}"
@@ -73,7 +92,23 @@ class TestMarkdownChunking:
             assert c.section_heading == "Big Section"
             assert len(c.content) <= 500
 
-    def test_deep_headings_stay_within_parent(self):
+    def test_markdown_default_chunk_size_and_overlap(self):
+        """Markdown uses 700/140 by default; oversized sections sub-split at that limit."""
+        long_content = "Word " * 200  # ~1000 chars
+        md = f"# Section\n\n{long_content}"
+        chunks = chunk_markdown(md)  # no size args: use markdown defaults
+        assert len(chunks) >= 2
+        for c in chunks:
+            assert len(c.content) <= MARKDOWN_CHUNK_SIZE
+        # Overlap: some text should appear in two adjacent chunks
+        if len(chunks) >= 2:
+            overlap_ok = (
+                chunks[0].content[-50:] in chunks[1].content
+                or chunks[1].content[:50] in chunks[0].content
+            )
+            assert overlap_ok
+
+    def test_h4_sections_get_own_heading_path(self):
         md = (
             "# Top\n\n"
             "## Parent\n\n"
@@ -81,10 +116,9 @@ class TestMarkdownChunking:
             "Some more parent content.\n"
         )
         chunks = chunk_markdown(md)
-        for c in chunks:
-            if c.content and "Deep sub content" in c.content:
-                assert c.section_heading is not None
-                assert "Deep Sub" not in c.section_heading
+        deep_chunks = [c for c in chunks if c.content and "Deep sub content" in c.content]
+        assert len(deep_chunks) >= 1
+        assert deep_chunks[0].section_heading == "Top > Parent > Deep Sub"
 
     def test_no_headers_falls_back_to_plain_chunking(self):
         text = "Just plain text without any markdown headers. " * 50

@@ -28,10 +28,15 @@ _processor: PipelineProcessor | None = None
 DEFAULT_CHUNK_SIZE = 1000
 DEFAULT_CHUNK_OVERLAP = 200
 
+# Smaller chunks for markdown to reduce mixed-context noise in wiki-style content.
+MARKDOWN_CHUNK_SIZE = 700
+MARKDOWN_CHUNK_OVERLAP = 140
+
 _MARKDOWN_HEADERS = [
     ("#", "h1"),
     ("##", "h2"),
     ("###", "h3"),
+    ("####", "h4"),
 ]
 
 
@@ -72,25 +77,25 @@ def chunk_text(
 
 def _build_heading_path(metadata: dict[str, str]) -> str | None:
     """Build a ' > '-separated heading path from MarkdownHeaderTextSplitter metadata."""
-    parts = [metadata[key] for key in ("h1", "h2", "h3") if key in metadata]
+    parts = [metadata[key] for key in ("h1", "h2", "h3", "h4") if key in metadata]
     return " > ".join(parts) if parts else None
 
 
 def chunk_markdown(
     text: str,
-    chunk_size: int = DEFAULT_CHUNK_SIZE,
-    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+    chunk_size: int = MARKDOWN_CHUNK_SIZE,
+    chunk_overlap: int = MARKDOWN_CHUNK_OVERLAP,
 ) -> list[ChunkWithHeading]:
     """Split markdown text by section headers, sub-splitting oversized sections.
 
-    First pass: split on #, ##, ### headers (keeping each section coherent).
+    First pass: split on #, ##, ###, #### headers (keeping each section coherent).
     Second pass: any section exceeding chunk_size is further split using
     RecursiveCharacterTextSplitter; sub-chunks inherit the parent heading.
 
     Args:
         text: Markdown text to split.
-        chunk_size: Maximum characters per chunk (for sub-splitting).
-        chunk_overlap: Overlap characters for sub-splits.
+        chunk_size: Maximum characters per chunk (for sub-splitting). Default 700 for wiki-aware chunking.
+        chunk_overlap: Overlap characters for sub-splits. Default 140.
 
     Returns:
         List of ChunkWithHeading, or empty list if text is empty.
