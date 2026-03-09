@@ -139,8 +139,8 @@ export function ChatDrawer({
             onCreate={createChat}
             hasDocuments={hasDocuments}
             onStarterPrompt={async (prompt: string) => {
-              await createChat();
-              sendMessage(prompt);
+              const newId = await createChat();
+              if (newId) sendMessage(prompt, newId);
             }}
           />
         )}
@@ -159,7 +159,7 @@ function ConversationBar({
   conversations: ConversationResponse[];
   activeId: string | null;
   onSelect: (id: string) => Promise<void>;
-  onCreate: () => Promise<void>;
+  onCreate: () => Promise<string | undefined>;
   onDelete: (id: string) => Promise<void>;
 }) {
   return (
@@ -377,10 +377,10 @@ function MessageInput({
 }
 
 const STARTER_PROMPTS = [
-  "What themes connect these documents?",
-  "Summarize the key findings",
-  "What are the most important details?",
-  "Find contradictions across sources",
+  "What knowledge does The Archive hold?",
+  "What are the key concepts to understand?",
+  "Where should a beginner start?",
+  "How do the topics here relate to each other?",
 ];
 
 function DrawerEmptyState({
@@ -388,7 +388,7 @@ function DrawerEmptyState({
   hasDocuments,
   onStarterPrompt,
 }: {
-  onCreate: () => Promise<void>;
+  onCreate: () => Promise<string | undefined>;
   hasDocuments: boolean;
   onStarterPrompt: (prompt: string) => void;
 }) {

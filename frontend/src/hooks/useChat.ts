@@ -24,10 +24,10 @@ export interface UseChatReturn {
   streaming: StreamingMessage | null;
   loading: boolean;
   error: string | null;
-  createChat: () => Promise<void>;
+  createChat: () => Promise<string | undefined>;
   selectConversation: (id: string) => Promise<void>;
   deleteChat: (id: string) => Promise<void>;
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, conversationIdOverride?: string) => void;
   clearError: () => void;
 }
 
@@ -76,7 +76,7 @@ export function useChat(): UseChatReturn {
     }
   }, []);
 
-  const createChat = useCallback(async () => {
+  const createChat = useCallback(async (): Promise<string | undefined> => {
     try {
       setError(null);
       const conv = await createConversation();
@@ -84,8 +84,10 @@ export function useChat(): UseChatReturn {
       setActiveConversationId(conv.id);
       setMessages([]);
       setStreaming(null);
+      return conv.id;
     } catch (err) {
       setError(errorMessage(err, "Failed to create conversation"));
+      return undefined;
     }
   }, []);
 
@@ -117,14 +119,15 @@ export function useChat(): UseChatReturn {
   );
 
   const sendMessage = useCallback(
-    (content: string) => {
-      if (!activeConversationId || sendingRef.current) return;
+    (content: string, conversationIdOverride?: string) => {
+      const targetId = conversationIdOverride ?? activeConversationId;
+      if (!targetId || sendingRef.current) return;
 
       sendingRef.current = true;
 
       const userMessage: MessageResponse = {
         id: `temp-${Date.now()}`,
-        conversation_id: activeConversationId,
+        conversation_id: targetId,
         role: "user",
         content,
         sources: null,
@@ -139,7 +142,7 @@ export function useChat(): UseChatReturn {
       let accumulatedContent = "";
       let accumulatedSources: SourceAttribution[] = [];
       let messageId = "";
-      const conversationId = activeConversationId;
+      const conversationId = targetId;
 
       abortRef.current = sendMessageStream(conversationId, content, {
         onStart: (id) => {
