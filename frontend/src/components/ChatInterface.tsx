@@ -76,7 +76,7 @@ function ConversationSelector({
   conversations: ConversationResponse[];
   activeId: string | null;
   onSelect: (id: string) => Promise<void>;
-  onCreate: () => Promise<void>;
+  onCreate: () => Promise<string | undefined>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -386,7 +386,7 @@ function MessageInput({
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => Promise<void> }) {
+function EmptyState({ onCreate }: { onCreate: () => Promise<string | undefined> }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-4">
       <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
