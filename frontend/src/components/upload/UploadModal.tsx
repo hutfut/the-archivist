@@ -49,7 +49,7 @@ export function UploadModal({
     <dialog
       ref={dialogRef}
       onCancel={onClose}
-      className="max-w-lg w-full rounded-xl p-0 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] shadow-2xl backdrop:bg-black/60"
+      className="fixed inset-0 m-auto max-w-lg w-full max-h-fit rounded-xl p-0 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] shadow-2xl backdrop:bg-black/60"
     >
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
